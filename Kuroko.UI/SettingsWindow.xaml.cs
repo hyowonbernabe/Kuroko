@@ -84,8 +84,9 @@ public partial class SettingsWindow : Window
         sb.AppendLine($"DECOY_TITLE={TxtDecoyTitle.Text}");
         sb.AppendLine($"DECOY_ICON={TxtDecoyIcon.Text}");
 
-        // Escape newlines for single-line storage
-        sb.AppendLine($"SYSTEM_PROMPT={TxtSystemPrompt.Text.Replace("\n", "\\n")}");
+        // Fix: Remove \r before escaping \n to prevent unintentional line breaks in .env
+        string sanitizedPrompt = TxtSystemPrompt.Text.Replace("\r", "").Replace("\n", "\\n");
+        sb.AppendLine($"SYSTEM_PROMPT={sanitizedPrompt}");
 
         File.WriteAllText(_envPath, sb.ToString());
 
