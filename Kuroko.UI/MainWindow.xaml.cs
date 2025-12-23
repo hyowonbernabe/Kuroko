@@ -1,16 +1,13 @@
 ﻿using Kuroko.Audio;
 using Kuroko.Core;
 using Kuroko.RAG;
-using Microsoft.Win32;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 
 namespace Kuroko.UI;
 
@@ -25,19 +22,48 @@ public partial class MainWindow : Window
     private TranscriptionService? _transcriptionService;
     private HotkeyService? _hotkeyService;
     private AiService? _aiService;
-    private PdfParserService? _pdfParser;
+
     private VectorDbService? _vectorDb;
     private EmbeddingService? _embeddingService;
 
-    private bool _isDebugRecording = false;
+    private TranscriptWindow? _transcriptWindow;
+    private OutputWindow? _outputWindow;
+    private SettingsWindow? _settingsWindow;
+
     private bool _isListening = false;
     private string _fullTranscriptBuffer = "";
     private string _apiKey = "";
+    private string _modelId = "";
 
     public MainWindow()
     {
         InitializeComponent();
-        _apiKey = LoadApiKeyFromEnv();
+        LoadSettingsFromEnv();
+        InitializeWindows();
+    }
+
+    private void InitializeWindows()
+    {
+        _transcriptWindow = new TranscriptWindow();
+        _outputWindow = new OutputWindow();
+        _settingsWindow = new SettingsWindow();
+
+        _settingsWindow.SettingsUpdated += (s, e) =>
+        {
+            LoadSettingsFromEnv();
+            RegisterHotkeys();
+            _aiService?.Dispose();
+            _aiService = null;
+        };
+
+        // --- TOP MOST LOGIC ---
+        _settingsWindow.TopMostChanged += (s, val) =>
+        {
+            this.Topmost = val;
+            if (_transcriptWindow != null) _transcriptWindow.Topmost = val;
+            if (_outputWindow != null) _outputWindow.Topmost = val;
+            if (_settingsWindow != null) _settingsWindow.Topmost = val;
+        };
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -45,20 +71,30 @@ public partial class MainWindow : Window
         base.OnSourceInitialized(e);
         EnableStealthMode();
         InitializeGlobalHotkeys();
-        CheckRagStatus();
-    }
+        PositionToolbar();
 
-    private void CheckRagStatus()
-    {
-        // Persistence check: If DB exists, we assume RAG is ready
-        if (File.Exists("kuroko_rag.db"))
+        string path = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+        if (File.Exists(path) && File.ReadAllText(path).Contains("WINDOW_TOPMOST=False"))
         {
-            StatusText.Text = "RAG READY";
-            StatusText.Foreground = new SolidColorBrush(Color.FromRgb(0, 150, 255));
+            this.Topmost = false;
+            _transcriptWindow!.Topmost = false;
+            _outputWindow!.Topmost = false;
+        }
+        else
+        {
+            this.Topmost = true;
+            _transcriptWindow!.Topmost = true;
+            _outputWindow!.Topmost = true;
         }
     }
 
-    // --- STEALTH & HOTKEY SETUP ---
+    private void PositionToolbar()
+    {
+        var workArea = SystemParameters.WorkArea;
+        this.Left = workArea.Left + 20;
+        this.Top = workArea.Bottom - this.Height - 20;
+    }
+
     private void EnableStealthMode()
     {
         var helper = new WindowInteropHelper(this);
@@ -68,75 +104,119 @@ public partial class MainWindow : Window
     private void InitializeGlobalHotkeys()
     {
         _hotkeyService = new HotkeyService();
-        _hotkeyService.HotkeyPressed += OnGlobalHotkeyPressed;
         var helper = new WindowInteropHelper(this);
-        _hotkeyService.Register(helper.Handle, HotkeyService.MOD_ALT, HotkeyService.VK_S);
+        _hotkeyService.Initialize(helper.Handle);
+        _hotkeyService.HotkeyPressed += OnGlobalHotkeyPressed;
+
+        RegisterHotkeys();
     }
 
-    // --- MARKDOWN RENDERER ---
-    private void RenderMarkdown(string markdown)
+    private void RegisterHotkeys()
     {
-        MarkdownContainer.Children.Clear();
+        _hotkeyService?.UnregisterAll();
+        // Trigger
+        _hotkeyService?.Register(1, HotkeyService.MOD_ALT, HotkeyService.VK_S);
+        // Panic
+        _hotkeyService?.Register(2, HotkeyService.MOD_ALT, HotkeyService.VK_Q);
+    }
 
-        if (string.IsNullOrWhiteSpace(markdown)) return;
-
-        var lines = markdown.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-
-        foreach (var line in lines)
+    private void ToggleWindow(Window? win)
+    {
+        if (win == null) return;
+        if (win.Visibility == Visibility.Visible) win.Hide();
+        else
         {
-            var textBlock = new TextBlock
-            {
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = new SolidColorBrush(Color.FromRgb(220, 220, 220)),
-                FontFamily = new FontFamily("Segoe UI"),
-                FontSize = 14,
-                Margin = new Thickness(0, 0, 0, 8)
-            };
-
-            string cleanLine = line.Trim();
-
-            if (cleanLine.StartsWith("- ") || cleanLine.StartsWith("* "))
-            {
-                cleanLine = cleanLine.Substring(2);
-                textBlock.Text = "• ";
-                textBlock.Foreground = Brushes.White;
-            }
-
-            var parts = Regex.Split(cleanLine, @"(\*\*.*?\*\*)");
-
-            foreach (var part in parts)
-            {
-                if (part.StartsWith("**") && part.EndsWith("**"))
-                {
-                    string content = part.Substring(2, part.Length - 4);
-                    textBlock.Inlines.Add(new Run(content) { FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(0, 255, 65)) });
-                }
-                else
-                {
-                    textBlock.Inlines.Add(new Run(part));
-                }
-            }
-
-            MarkdownContainer.Children.Add(textBlock);
+            win.Show();
+            win.Activate();
         }
     }
 
-    // --- AI TRIGGER ---
-    private async void OnGlobalHotkeyPressed(object? sender, EventArgs e)
+    private void ToggleTranscript_Click(object sender, RoutedEventArgs e) => ToggleWindow(_transcriptWindow);
+    private void ToggleOutput_Click(object sender, RoutedEventArgs e) => ToggleWindow(_outputWindow);
+    private void ToggleSettings_Click(object sender, RoutedEventArgs e) => ToggleWindow(_settingsWindow);
+
+    private async void BtnInit_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrEmpty(_apiKey))
+        if (_isListening)
         {
-            AiResponseOverlay.Visibility = Visibility.Visible;
-            RenderMarkdown("**Error:** API Key missing in .env");
+            try
+            {
+                _audioService?.Dispose();
+                _transcriptionService?.Dispose();
+            }
+            catch { }
+            _audioService = null; _transcriptionService = null;
+            _isListening = false;
+
+            BtnInit.Content = "INITIALIZE";
+            BtnInit.Foreground = new SolidColorBrush(Color.FromRgb(136, 136, 136));
+            StatusText.Text = "OFFLINE";
+            StatusText.Foreground = new SolidColorBrush(Color.FromRgb(102, 102, 102));
+            StatusIndicator.Background = new SolidColorBrush(Color.FromRgb(68, 68, 68));
+            ((DropShadowEffect)StatusIndicator.Effect).Color = Color.FromRgb(68, 68, 68);
+
+            _transcriptWindow?.AppendLog("[SYSTEM STOPPED]");
+        }
+        else
+        {
+            BtnInit.Content = "...";
+            StatusText.Text = "LOADING";
+            try
+            {
+                _audioService = new AudioCaptureService();
+                _transcriptionService = new TranscriptionService(_audioService);
+
+                _transcriptionService.OnSegmentTranscribed += (s, text) =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        _fullTranscriptBuffer += text + " ";
+                        _transcriptWindow?.AppendLog(text);
+                    });
+                };
+
+                await _transcriptionService.InitializeAsync();
+                _audioService.StartSystemAudioCapture();
+
+                _transcriptWindow?.SetAudioService(_audioService);
+
+                _isListening = true;
+                BtnInit.Content = "STOP";
+                BtnInit.Foreground = new SolidColorBrush(Color.FromRgb(0, 255, 65));
+                StatusText.Text = "ACTIVE";
+                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(0, 255, 65));
+                StatusIndicator.Background = new SolidColorBrush(Color.FromRgb(0, 255, 65));
+                ((DropShadowEffect)StatusIndicator.Effect).Color = Color.FromRgb(0, 255, 65);
+
+                _transcriptWindow?.AppendLog("[SYSTEM ACTIVE - LISTENING]");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+                BtnInit.Content = "INITIALIZE";
+            }
+        }
+    }
+
+    private async void OnGlobalHotkeyPressed(object? sender, int id)
+    {
+        if (id == 2)
+        {
+            Application.Current.Shutdown();
             return;
         }
 
-        AiResponseOverlay.Visibility = Visibility.Visible;
-        MarkdownContainer.Children.Clear();
-        var loadingText = new TextBlock { Text = "Thinking...", Foreground = Brushes.Gray, FontFamily = new FontFamily("Consolas") };
-        MarkdownContainer.Children.Add(loadingText);
+        if (_outputWindow == null) return;
 
-        // Get Context
+        if (_outputWindow.Visibility != Visibility.Visible) _outputWindow.Show();
+        _outputWindow.SetLoading(true);
+
+        if (string.IsNullOrEmpty(_apiKey))
+        {
+            _outputWindow.RenderResponse("**Error:** API Key missing.");
+            return;
+        }
+
         string context = _fullTranscriptBuffer.Length > 2000
             ? _fullTranscriptBuffer.Substring(_fullTranscriptBuffer.Length - 2000)
             : _fullTranscriptBuffer;
@@ -146,12 +226,9 @@ public partial class MainWindow : Window
         {
             if (File.Exists("kuroko_rag.db"))
             {
-                if (_vectorDb == null)
-                {
-                    _vectorDb = new VectorDbService();
-                    await _vectorDb.InitializeAsync();
-                }
-                if (_embeddingService == null) _embeddingService = new EmbeddingService(_apiKey);
+                _vectorDb ??= new VectorDbService();
+                await _vectorDb.InitializeAsync();
+                _embeddingService ??= new EmbeddingService(_apiKey);
 
                 if (!string.IsNullOrEmpty(context))
                 {
@@ -167,196 +244,42 @@ public partial class MainWindow : Window
         }
         catch { }
 
-        if (_aiService == null) _aiService = new AiService(_apiKey);
+        if (_aiService == null) _aiService = new AiService(_apiKey, _modelId);
+
         string response = await _aiService.GetInterviewAssistanceAsync(context, ragContext);
 
-        RenderMarkdown(response);
-
-        // --- AUTO CLEAR CONTEXT AFTER RESPONSE ---
-        // This ensures the next request doesn't include the old conversation
-        ClearContext("AUTO");
-    }
-
-    private void ClearContext(string reason)
-    {
+        _outputWindow.RenderResponse(response);
         _fullTranscriptBuffer = "";
-
-        Dispatcher.Invoke(() =>
-        {
-            TranscriptText.Text += $"\n\n[--- CONTEXT CLEARED ({reason}) ---]\n";
-            TranscriptScroller.ScrollToBottom();
-        });
+        _transcriptWindow?.AppendLog("\n[--- CONTEXT CLEARED (AUTO) ---]");
     }
 
-    // --- BUTTON EVENTS ---
-
-    private async void BtnStart_Click(object sender, RoutedEventArgs e)
-    {
-        if (_isListening)
-        {
-            // STOP Logic
-            try
-            {
-                _audioService?.Dispose();
-                // Swallow race condition exceptions if processor is busy
-                _transcriptionService?.Dispose();
-            }
-            catch { /* Ignore disposal errors during stop */ }
-
-            _audioService = null;
-            _transcriptionService = null;
-
-            _isListening = false;
-            BtnStart.Content = "INITIALIZE";
-            BtnStart.Foreground = new SolidColorBrush(Color.FromRgb(102, 102, 102)); // #666
-            StatusText.Text = "STOPPED";
-            StatusText.Foreground = new SolidColorBrush(Color.FromRgb(68, 68, 68)); // Dark Gray
-            TranscriptText.Text += "\n[SYSTEM STOPPED]";
-        }
-        else
-        {
-            // START Logic
-            BtnStart.IsEnabled = false;
-            BtnStart.Content = "LOADING...";
-            StatusText.Text = "INITIALIZING";
-
-            try
-            {
-                _audioService = new AudioCaptureService();
-                _transcriptionService = new TranscriptionService(_audioService);
-
-                _transcriptionService.OnSegmentTranscribed += (s, text) =>
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        _fullTranscriptBuffer += text + " ";
-                        TranscriptText.Text += $"\n> {text.Trim()}";
-                        TranscriptScroller.ScrollToBottom();
-                    });
-                };
-
-                await _transcriptionService.InitializeAsync();
-                _audioService.StartSystemAudioCapture();
-
-                _isListening = true;
-                BtnStart.IsEnabled = true;
-                StatusText.Text = "SYSTEM ACTIVE";
-                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(0, 255, 65)); // Neon Green
-                BtnStart.Content = "STOP";
-                BtnStart.Foreground = new SolidColorBrush(Color.FromRgb(0, 255, 65));
-                TranscriptText.Text += "\n[SYSTEM STARTED - LISTENING...]";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message);
-                BtnStart.IsEnabled = true;
-                BtnStart.Content = "RETRY";
-            }
-        }
-    }
-
-    private void BtnClearContext_Click(object sender, RoutedEventArgs e)
-    {
-        ClearContext("MANUAL");
-    }
-
-    private async void BtnResetRag_Click(object sender, RoutedEventArgs e)
-    {
-        if (MessageBox.Show("Are you sure you want to wipe the RAG database? You will need to re-upload your PDF.", "Confirm Reset", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
-        {
-            try
-            {
-                _vectorDb ??= new VectorDbService();
-                await _vectorDb.InitializeAsync();
-                await _vectorDb.ClearDatabaseAsync();
-                StatusText.Text = "DB CLEARED";
-                StatusText.Foreground = Brushes.Gray;
-                MessageBox.Show("Database cleared.");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error clearing DB: {ex.Message}");
-            }
-        }
-    }
-
-    private async void BtnIngest_Click(object sender, RoutedEventArgs e)
-    {
-        if (string.IsNullOrEmpty(_apiKey)) { MessageBox.Show("Missing API Key"); return; }
-
-        var dialog = new OpenFileDialog { Filter = "PDF|*.pdf" };
-        if (dialog.ShowDialog() == true)
-        {
-            StatusText.Text = "PARSING PDF...";
-            try
-            {
-                _pdfParser ??= new PdfParserService();
-                _vectorDb ??= new VectorDbService();
-                _embeddingService ??= new EmbeddingService(_apiKey);
-
-                await _vectorDb.InitializeAsync();
-                // We do NOT auto-clear here anymore, allowing append if desired, 
-                // but user can use RESET DB button to clear first.
-
-                string text = _pdfParser.ExtractTextFromPdf(dialog.FileName);
-                var chunks = _pdfParser.ChunkText(text);
-
-                foreach (var chunk in chunks)
-                {
-                    var vec = await _embeddingService.GenerateEmbeddingAsync(chunk);
-                    if (vec.Length > 0) await _vectorDb.InsertChunkAsync(chunk, vec);
-                }
-                StatusText.Text = "INGESTION COMPLETE";
-                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(0, 150, 255));
-            }
-            catch (Exception ex) { MessageBox.Show(ex.Message); }
-        }
-    }
-
-    private void Header_MouseDown(object sender, MouseButtonEventArgs e) { if (e.LeftButton == MouseButtonState.Pressed) DragMove(); }
-    private void DismissAi_Click(object sender, RoutedEventArgs e) { AiResponseOverlay.Visibility = Visibility.Collapsed; }
-    private void ExitButton_Click(object sender, RoutedEventArgs e) { Application.Current.Shutdown(); }
-
-    private void BtnDebug_Click(object sender, RoutedEventArgs e)
-    {
-        if (_audioService == null) return;
-        if (!_isDebugRecording)
-        {
-            string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "kuroko_debug.wav");
-            _audioService.StartDebugRecording(path);
-            _isDebugRecording = true;
-            BtnDebug.Content = "STOP REC";
-            BtnDebug.Foreground = Brushes.Red;
-        }
-        else
-        {
-            _audioService.StopDebugRecording();
-            _isDebugRecording = false;
-            BtnDebug.Content = "REC DEBUG";
-            BtnDebug.Foreground = new SolidColorBrush(Color.FromRgb(136, 68, 68));
-        }
-    }
-
-    private string LoadApiKeyFromEnv()
+    private void LoadSettingsFromEnv()
     {
         try
         {
-            string path = ".env";
-            if (!File.Exists(path))
-            {
-                var d = new DirectoryInfo(Directory.GetCurrentDirectory());
-                while (d != null && !File.Exists(Path.Combine(d.FullName, ".env"))) d = d.Parent;
-                if (d != null) path = Path.Combine(d.FullName, ".env");
-            }
+            string path = Path.Combine(Directory.GetCurrentDirectory(), ".env");
             if (File.Exists(path))
             {
                 foreach (var line in File.ReadAllLines(path))
                 {
-                    if (line.StartsWith("OPENROUTER_API_KEY=")) return line.Split('=', 2)[1].Trim();
+                    var parts = line.Split('=', 2);
+                    if (parts.Length != 2) continue;
+
+                    if (parts[0].Trim() == "OPENROUTER_API_KEY") _apiKey = parts[1].Trim();
+                    if (parts[0].Trim() == "OPENROUTER_MODEL") _modelId = parts[1].Trim();
                 }
             }
         }
         catch { }
-        return "";
+    }
+
+    private void Header_MouseDown(object sender, MouseButtonEventArgs e) { if (e.LeftButton == MouseButtonState.Pressed) DragMove(); }
+    private void ExitButton_Click(object sender, RoutedEventArgs e)
+    {
+        _hotkeyService?.Dispose();
+        _transcriptWindow?.Close();
+        _outputWindow?.Close();
+        _settingsWindow?.Close();
+        Application.Current.Shutdown();
     }
 }

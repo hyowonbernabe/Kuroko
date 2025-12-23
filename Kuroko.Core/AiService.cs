@@ -10,10 +10,15 @@ namespace Kuroko.Core;
 public class AiService : IDisposable
 {
     private readonly HttpClient _httpClient;
-    private const string DefaultModel = "mistralai/devstral-2512:free";
+    private readonly string _modelId;
 
-    public AiService(string apiKey, string modelId = DefaultModel)
+    // Default fallback if settings are empty
+    private const string DefaultModelFallback = "google/gemini-2.0-flash-exp:free";
+
+    public AiService(string apiKey, string? modelId = null)
     {
+        _modelId = !string.IsNullOrWhiteSpace(modelId) ? modelId : DefaultModelFallback;
+
         _httpClient = new HttpClient
         {
             BaseAddress = new Uri("https://openrouter.ai/api/v1/"),
@@ -58,7 +63,7 @@ public class AiService : IDisposable
         {
             var requestBody = new
             {
-                model = DefaultModel,
+                model = _modelId,
                 messages = new[]
                 {
                     new { role = "system", content = systemPrompt },
