@@ -4,7 +4,7 @@
         mc:Ignorable="d"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        Title="Kuroko Toolbar" Height="80" Width="520"
+        Title="Kuroko Toolbar" Height="50" Width="520"
         Background="Transparent"
         AllowsTransparency="True"
         WindowStyle="None"
@@ -13,7 +13,6 @@
         ShowInTaskbar="True">
 
     <Window.Resources>
-        <!-- Consistent Button Style -->
         <Style TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#888"/>
@@ -44,43 +43,40 @@
         </Style>
     </Window.Resources>
 
-    <!-- Main Container matching TranscriptWindow Style -->
-    <Border Background="#CC111111" BorderBrush="#333" BorderThickness="1" CornerRadius="5">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="30"/>
-                <!-- Header -->
-                <RowDefinition Height="*"/>
-                <!-- Toolbar Content -->
-            </Grid.RowDefinitions>
+    <Border Background="#CC111111" BorderBrush="#333" BorderThickness="1" CornerRadius="25">
+        <Grid MouseDown="Header_MouseDown">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <!-- Status -->
+                <ColumnDefinition Width="*"/>
+                <!-- Spacer -->
+                <ColumnDefinition Width="Auto"/>
+                <!-- Controls -->
+                <ColumnDefinition Width="Auto"/>
+                <!-- Exit -->
+            </Grid.ColumnDefinitions>
 
-            <!-- Header Row -->
-            <Border Grid.Row="0" Background="#111" CornerRadius="5,5,0,0" MouseDown="Header_MouseDown">
-                <DockPanel LastChildFill="False" Margin="10,0">
-                    <!-- Status Indicator (Left) -->
-                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border x:Name="StatusIndicator" Width="8" Height="8" Background="#444" CornerRadius="4">
-                            <Border.Effect>
-                                <DropShadowEffect Color="#444" BlurRadius="4" Opacity="0.8"/>
-                            </Border.Effect>
-                        </Border>
-                        <TextBlock x:Name="StatusText" Text="OFFLINE" Foreground="#666" FontFamily="Consolas" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                    </StackPanel>
+            <!-- Status -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
+                <Border x:Name="StatusIndicator" Width="8" Height="8" Background="#444" CornerRadius="4">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#444" BlurRadius="4" Opacity="0.8"/>
+                    </Border.Effect>
+                </Border>
+                <TextBlock x:Name="StatusText" Text="OFFLINE" Foreground="#666" FontFamily="Consolas" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0"/>
+            </StackPanel>
 
-                    <!-- Exit (Right) -->
-                    <Button DockPanel.Dock="Right" Content="✕" Click="ExitButton_Click" Foreground="#844" Padding="5,0"/>
-                    <TextBlock DockPanel.Dock="Right" Text="KUROKO // MAIN" Foreground="#333" FontFamily="Consolas" FontSize="10" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                </DockPanel>
-            </Border>
-
-            <!-- Content Row -->
-            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <!-- Controls -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0">
                 <Button x:Name="BtnInit" Content="INITIALIZE" Click="BtnInit_Click" FontWeight="Bold"/>
                 <Border Width="1" Height="14" Background="#333" Margin="5,0"/>
-                <Button Content="TRANSCRIPTS" Click="ToggleTranscript_Click"/>
-                <Button Content="AI OUTPUT" Click="ToggleOutput_Click"/>
-                <Button Content="SETTINGS" Click="ToggleSettings_Click"/>
+                <Button Content="LOGS" Click="ToggleTranscript_Click"/>
+                <Button Content="AI" Click="ToggleOutput_Click"/>
+                <Button Content="SET" Click="ToggleSettings_Click"/>
             </StackPanel>
+
+            <!-- Exit -->
+            <Button Grid.Column="3" Content="✕" Click="ExitButton_Click" Foreground="#844" Padding="8,0" Margin="0,0,15,0" VerticalAlignment="Center"/>
         </Grid>
     </Border>
 </Window>

@@ -35,6 +35,11 @@ public partial class MainWindow : Window
     private string _apiKey = "";
     private string _modelId = "";
 
+    // Track if windows have been positioned once
+    private bool _transcriptPositioned = false;
+    private bool _outputPositioned = false;
+    private bool _settingsPositioned = false;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -120,6 +125,8 @@ public partial class MainWindow : Window
         _hotkeyService?.Register(2, HotkeyService.MOD_ALT, HotkeyService.VK_Q);
     }
 
+    // --- WINDOW POSITIONING LOGIC ---
+
     private void ToggleWindow(Window? win)
     {
         if (win == null) return;
@@ -131,9 +138,48 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ToggleTranscript_Click(object sender, RoutedEventArgs e) => ToggleWindow(_transcriptWindow);
-    private void ToggleOutput_Click(object sender, RoutedEventArgs e) => ToggleWindow(_outputWindow);
-    private void ToggleSettings_Click(object sender, RoutedEventArgs e) => ToggleWindow(_settingsWindow);
+    private void ToggleTranscript_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_transcriptPositioned && _transcriptWindow != null)
+        {
+            // Default: Top Left
+            var area = SystemParameters.WorkArea;
+            _transcriptWindow.Left = area.Left + 20;
+            _transcriptWindow.Top = area.Top + 20;
+            _transcriptPositioned = true;
+        }
+        ToggleWindow(_transcriptWindow);
+    }
+
+    private void ToggleOutput_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_outputPositioned && _outputWindow != null)
+        {
+            // Default: Next to Transcript (Top Left + Transcript Width + Padding)
+            // Assuming Transcript Width is 350
+            var area = SystemParameters.WorkArea;
+            _outputWindow.Left = area.Left + 20 + 350 + 10;
+            _outputWindow.Top = area.Top + 20;
+            _outputPositioned = true;
+        }
+        ToggleWindow(_outputWindow);
+    }
+
+    private void ToggleSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_settingsPositioned && _settingsWindow != null)
+        {
+            // Default: Top Right
+            var area = SystemParameters.WorkArea;
+            // Assuming Settings Width is 400
+            _settingsWindow.Left = area.Right - 400 - 20;
+            _settingsWindow.Top = area.Top + 20;
+            _settingsPositioned = true;
+        }
+        ToggleWindow(_settingsWindow);
+    }
+
+    // --- MAIN LOGIC ---
 
     private async void BtnInit_Click(object sender, RoutedEventArgs e)
     {
@@ -207,6 +253,15 @@ public partial class MainWindow : Window
         }
 
         if (_outputWindow == null) return;
+
+        // Ensure positioning applied even if triggered via hotkey first
+        if (!_outputPositioned)
+        {
+            var area = SystemParameters.WorkArea;
+            _outputWindow.Left = area.Left + 20 + 350 + 10;
+            _outputWindow.Top = area.Top + 20;
+            _outputPositioned = true;
+        }
 
         if (_outputWindow.Visibility != Visibility.Visible) _outputWindow.Show();
         _outputWindow.SetLoading(true);
