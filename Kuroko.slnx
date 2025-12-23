@@ -1,3 +1,6 @@
 <Solution>
+  <Project Path="Kuroko.Audio/Kuroko.Audio.csproj" />
+  <Project Path="Kuroko.Core/Kuroko.Core.csproj" />
+  <Project Path="Kuroko.RAG/Kuroko.RAG.csproj" />
   <Project Path="Kuroko.UI/Kuroko.UI.csproj" />
 </Solution>

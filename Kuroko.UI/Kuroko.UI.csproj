@@ -8,4 +8,14 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="MaterialDesignThemes" Version="5.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kuroko.Audio\Kuroko.Audio.csproj" />
+    <ProjectReference Include="..\Kuroko.Core\Kuroko.Core.csproj" />
+    <ProjectReference Include="..\Kuroko.RAG\Kuroko.RAG.csproj" />
+  </ItemGroup>
+
 </Project>
