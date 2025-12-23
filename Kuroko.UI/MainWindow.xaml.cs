@@ -75,8 +75,9 @@ public partial class MainWindow : Window
             LoadSettingsFromEnv();
             RegisterHotkeys();
             ApplyDeepStealth(_deepStealthEnabled);
-            _aiService?.Dispose();
-            _aiService = null;
+
+            // OPTIMIZATION: Reset all services to ensure new Keys/Models are picked up
+            ResetServices();
         };
 
         _settingsWindow.DecoyUpdated += (s, e) =>
@@ -98,6 +99,20 @@ public partial class MainWindow : Window
         _settingsWindow.DeepStealthChanged += (s, val) => ApplyDeepStealth(val);
 
         _settingsWindow.ResetLayoutRequested += (s, e) => ResetWindowPositions();
+    }
+
+    // New helper to cleanly reset backend services when settings change
+    private void ResetServices()
+    {
+        _aiService?.Dispose();
+        _aiService = null;
+
+        // Dispose RAG services so they can be re-initialized with new API keys if needed
+        _embeddingService?.Dispose();
+        _embeddingService = null;
+
+        _vectorDb?.Dispose();
+        _vectorDb = null;
     }
 
     // Helper to apply WS_EX_TOOLWINDOW style
@@ -448,8 +463,14 @@ public partial class MainWindow : Window
         {
             if (File.Exists("kuroko_rag.db"))
             {
-                _vectorDb ??= new VectorDbService();
-                await _vectorDb.InitializeAsync();
+                // OPTIMIZATION: Check if already initialized to prevent DB thrashing
+                if (_vectorDb == null)
+                {
+                    _vectorDb = new VectorDbService();
+                    await _vectorDb.InitializeAsync();
+                }
+
+                // Reuse embedding service instance
                 _embeddingService ??= new EmbeddingService(_apiKey);
 
                 if (!string.IsNullOrEmpty(context))
