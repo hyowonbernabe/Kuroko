@@ -16,7 +16,7 @@ public partial class SettingsWindow : Window
     public event EventHandler<bool>? TopMostChanged;
     public event EventHandler? SettingsUpdated;
     public event EventHandler<string>? ApiKeyUpdated;
-    public event EventHandler? ResetLayoutRequested; // New Event
+    public event EventHandler? ResetLayoutRequested; // Restored Event
 
     private string _envPath;
 

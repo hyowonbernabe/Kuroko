@@ -13,7 +13,7 @@ public class AiService : IDisposable
     private readonly string _modelId;
 
     // Default fallback if settings are empty
-    private const string DefaultModelFallback = "google/gemini-2.0-flash-exp:free";
+    private const string DefaultModelFallback = "google/gemma-3-27b-it:free";
 
     public AiService(string apiKey, string? modelId = null)
     {

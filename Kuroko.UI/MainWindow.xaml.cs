@@ -70,37 +70,8 @@ public partial class MainWindow : Window
             if (_settingsWindow != null) _settingsWindow.Topmost = val;
         };
 
-        // --- RESET LAYOUT LOGIC ---
+        // --- RESTORED RESET LOGIC ---
         _settingsWindow.ResetLayoutRequested += (s, e) => ResetWindowPositions();
-    }
-
-    protected override void OnSourceInitialized(EventArgs e)
-    {
-        base.OnSourceInitialized(e);
-        EnableStealthMode();
-        InitializeGlobalHotkeys();
-        PositionToolbar();
-
-        string path = Path.Combine(Directory.GetCurrentDirectory(), ".env");
-        if (File.Exists(path) && File.ReadAllText(path).Contains("WINDOW_TOPMOST=False"))
-        {
-            this.Topmost = false;
-            _transcriptWindow!.Topmost = false;
-            _outputWindow!.Topmost = false;
-        }
-        else
-        {
-            this.Topmost = true;
-            _transcriptWindow!.Topmost = true;
-            _outputWindow!.Topmost = true;
-        }
-    }
-
-    private void PositionToolbar()
-    {
-        var workArea = SystemParameters.WorkArea;
-        this.Left = workArea.Left + 20;
-        this.Top = workArea.Bottom - this.Height - 20;
     }
 
     private void ResetWindowPositions()
@@ -135,6 +106,35 @@ public partial class MainWindow : Window
         }
     }
 
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        EnableStealthMode();
+        InitializeGlobalHotkeys();
+        PositionToolbar();
+
+        string path = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+        if (File.Exists(path) && File.ReadAllText(path).Contains("WINDOW_TOPMOST=False"))
+        {
+            this.Topmost = false;
+            _transcriptWindow!.Topmost = false;
+            _outputWindow!.Topmost = false;
+        }
+        else
+        {
+            this.Topmost = true;
+            _transcriptWindow!.Topmost = true;
+            _outputWindow!.Topmost = true;
+        }
+    }
+
+    private void PositionToolbar()
+    {
+        var workArea = SystemParameters.WorkArea;
+        this.Left = workArea.Left + 20;
+        this.Top = workArea.Bottom - this.Height - 20;
+    }
+
     private void EnableStealthMode()
     {
         var helper = new WindowInteropHelper(this);
@@ -155,9 +155,42 @@ public partial class MainWindow : Window
     {
         _hotkeyService?.UnregisterAll();
         // Trigger
-        _hotkeyService?.Register(1, HotkeyService.MOD_ALT, HotkeyService.VK_S);
+        var (mod1, key1) = ParseHotkey(_hotkeyTriggerRaw, HotkeyService.MOD_ALT, HotkeyService.VK_S);
+        _hotkeyService?.Register(1, mod1, key1);
+
         // Panic
-        _hotkeyService?.Register(2, HotkeyService.MOD_ALT, HotkeyService.VK_Q);
+        var (mod2, key2) = ParseHotkey(_hotkeyPanicRaw, HotkeyService.MOD_ALT, HotkeyService.VK_Q);
+        _hotkeyService?.Register(2, mod2, key2);
+    }
+
+    private (uint mod, uint key) ParseHotkey(string raw, uint defaultMod, uint defaultKey)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return (defaultMod, defaultKey);
+
+        uint mod = 0;
+        uint key = 0;
+
+        var parts = raw.Split('+');
+        foreach (var part in parts)
+        {
+            string p = part.Trim().ToUpper();
+            if (p == "CTRL" || p == "CONTROL") mod |= HotkeyService.MOD_CONTROL;
+            else if (p == "ALT") mod |= HotkeyService.MOD_ALT;
+            else if (p == "SHIFT") mod |= HotkeyService.MOD_SHIFT;
+            else if (p == "WIN") mod |= HotkeyService.MOD_WIN;
+            else
+            {
+                try
+                {
+                    Key k = (Key)Enum.Parse(typeof(Key), p, true);
+                    key = (uint)KeyInterop.VirtualKeyFromKey(k);
+                }
+                catch { }
+            }
+        }
+
+        if (key == 0) return (defaultMod, defaultKey);
+        return (mod, key);
     }
 
     // --- WINDOW POSITIONING LOGIC ---
@@ -284,7 +317,6 @@ public partial class MainWindow : Window
 
         if (_outputWindow == null) return;
 
-        // Ensure positioning applied even if triggered via hotkey first
         if (!_outputPositioned)
         {
             var area = SystemParameters.WorkArea;
@@ -352,6 +384,9 @@ public partial class MainWindow : Window
 
                     if (parts[0].Trim() == "OPENROUTER_API_KEY") _apiKey = parts[1].Trim();
                     if (parts[0].Trim() == "OPENROUTER_MODEL") _modelId = parts[1].Trim();
+
+                    if (parts[0].Trim() == "HOTKEY_TRIGGER_TXT") _hotkeyTriggerRaw = parts[1].Trim();
+                    if (parts[0].Trim() == "HOTKEY_PANIC_TXT") _hotkeyPanicRaw = parts[1].Trim();
                 }
             }
         }
@@ -367,4 +402,8 @@ public partial class MainWindow : Window
         _settingsWindow?.Close();
         Application.Current.Shutdown();
     }
+
+    // Default values if env read fails
+    private string _hotkeyTriggerRaw = "Alt + S";
+    private string _hotkeyPanicRaw = "Alt + Q";
 }

@@ -7,26 +7,28 @@ public class HotkeyService : IDisposable
 {
     private const uint WM_HOTKEY = 0x0312;
 
+    // Win32 Modifiers
     public const uint MOD_NONE = 0x0000;
     public const uint MOD_ALT = 0x0001;
     public const uint MOD_CONTROL = 0x0002;
     public const uint MOD_SHIFT = 0x0004;
     public const uint MOD_WIN = 0x0008;
+    public const uint MOD_NOREPEAT = 0x4000;
 
+    // Default Virtual Keys (Required for Main Window fallbacks)
     public const uint VK_S = 0x53;
     public const uint VK_Q = 0x51;
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
     private IntPtr _windowHandle;
     private HwndSource? _source;
     private readonly HashSet<int> _registeredIds = new();
 
-    // Event now returns the ID of the hotkey pressed
     public event EventHandler<int>? HotkeyPressed;
 
     public void Initialize(IntPtr windowHandle)
@@ -36,12 +38,18 @@ public class HotkeyService : IDisposable
         _source?.AddHook(HwndHook);
     }
 
-    public bool Register(int id, uint modifier, uint key)
+    public bool Register(int id, uint modifier, uint vk)
     {
         if (_windowHandle == IntPtr.Zero) return false;
 
-        bool success = RegisterHotKey(_windowHandle, id, modifier, key);
-        if (success) _registeredIds.Add(id);
+        // Try unregistering first to be safe
+        UnregisterHotKey(_windowHandle, id);
+
+        bool success = RegisterHotKey(_windowHandle, id, modifier | MOD_NOREPEAT, vk);
+        if (success)
+        {
+            _registeredIds.Add(id);
+        }
         return success;
     }
 
@@ -54,9 +62,6 @@ public class HotkeyService : IDisposable
                 UnregisterHotKey(_windowHandle, id);
             }
             _registeredIds.Clear();
-            _source?.RemoveHook(HwndHook);
-            _source = null;
-            _windowHandle = IntPtr.Zero;
         }
     }
 
@@ -68,7 +73,7 @@ public class HotkeyService : IDisposable
             if (_registeredIds.Contains(id))
             {
                 HotkeyPressed?.Invoke(this, id);
-                handled = true;
+                handled = true; // Prevent Windows "Beep"
             }
         }
         return IntPtr.Zero;
@@ -77,6 +82,7 @@ public class HotkeyService : IDisposable
     public void Dispose()
     {
         UnregisterAll();
+        _source?.RemoveHook(HwndHook);
         GC.SuppressFinalize(this);
     }
 }
