@@ -4,10 +4,13 @@ using Kuroko.RAG;
 using Microsoft.Win32;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 
 namespace Kuroko.UI;
 
@@ -22,8 +25,6 @@ public partial class MainWindow : Window
     private TranscriptionService? _transcriptionService;
     private HotkeyService? _hotkeyService;
     private AiService? _aiService;
-
-    // RAG Services
     private PdfParserService? _pdfParser;
     private VectorDbService? _vectorDb;
     private EmbeddingService? _embeddingService;
@@ -45,45 +46,7 @@ public partial class MainWindow : Window
         InitializeGlobalHotkeys();
     }
 
-    private string LoadApiKeyFromEnv()
-    {
-        try
-        {
-            string path = ".env";
-            if (!File.Exists(path))
-            {
-                var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
-                for (int i = 0; i < 4; i++)
-                {
-                    if (directory?.Parent == null) break;
-                    directory = directory.Parent;
-                    var check = Path.Combine(directory.FullName, ".env");
-                    if (File.Exists(check))
-                    {
-                        path = check;
-                        break;
-                    }
-                }
-            }
-
-            if (File.Exists(path))
-            {
-                foreach (var line in File.ReadAllLines(path))
-                {
-                    var parts = line.Split('=', 2);
-                    if (parts.Length != 2) continue;
-
-                    if (parts[0].Trim() == "OPENROUTER_API_KEY")
-                    {
-                        return parts[1].Trim();
-                    }
-                }
-            }
-        }
-        catch { }
-        return "";
-    }
-
+    // --- STEALTH & HOTKEY SETUP ---
     private void EnableStealthMode()
     {
         var helper = new WindowInteropHelper(this);
@@ -94,167 +57,115 @@ public partial class MainWindow : Window
     {
         _hotkeyService = new HotkeyService();
         _hotkeyService.HotkeyPressed += OnGlobalHotkeyPressed;
-
         var helper = new WindowInteropHelper(this);
-        bool success = _hotkeyService.Register(helper.Handle, HotkeyService.MOD_ALT, HotkeyService.VK_S);
-
-        if (!success)
-        {
-            StatusText.Text = "Warning: Hotkey Failed to Register";
-        }
+        // Default Alt+S
+        _hotkeyService.Register(helper.Handle, HotkeyService.MOD_ALT, HotkeyService.VK_S);
     }
 
-    // --- RAG INGESTION LOGIC ---
-    private async void BtnIngest_Click(object sender, RoutedEventArgs e)
+    // --- MARKDOWN RENDERER ---
+    // Converts basic AI markdown (* bold, - list) into WPF TextBlocks
+    private void RenderMarkdown(string markdown)
     {
-        if (string.IsNullOrEmpty(_apiKey))
-        {
-            MessageBox.Show("Please set OPENROUTER_API_KEY in .env first.");
-            return;
-        }
+        MarkdownContainer.Children.Clear();
 
-        var openFileDialog = new OpenFileDialog
-        {
-            Filter = "PDF Files (*.pdf)|*.pdf",
-            Title = "Select Resume or LinkedIn Profile"
-        };
+        if (string.IsNullOrWhiteSpace(markdown)) return;
 
-        if (openFileDialog.ShowDialog() == true)
-        {
-            BtnIngest.IsEnabled = false;
-            StatusText.Text = "Parsing PDF...";
+        var lines = markdown.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
 
-            try
+        foreach (var line in lines)
+        {
+            var textBlock = new TextBlock
             {
-                // 1. Initialize RAG Components
-                _pdfParser ??= new PdfParserService();
-                _vectorDb ??= new VectorDbService();
-                _embeddingService ??= new EmbeddingService(_apiKey);
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = new SolidColorBrush(Color.FromRgb(220, 220, 220)), // Off-white
+                FontFamily = new FontFamily("Segoe UI"),
+                FontSize = 14,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
 
-                await _vectorDb.InitializeAsync();
+            string cleanLine = line.Trim();
 
-                // Optional: Clear DB for this MVP so we don't mix old resumes
-                await _vectorDb.ClearDatabaseAsync();
+            // 1. Check for Bullet Points
+            if (cleanLine.StartsWith("- ") || cleanLine.StartsWith("* "))
+            {
+                cleanLine = cleanLine.Substring(2);
+                textBlock.Text = "• ";
+                textBlock.Foreground = Brushes.White;
+            }
 
-                // 2. Parse Text
-                string fullText = _pdfParser.ExtractTextFromPdf(openFileDialog.FileName);
-                if (string.IsNullOrWhiteSpace(fullText))
+            // 2. Check for Bold (**text**)
+            // Simple regex to split by **
+            var parts = Regex.Split(cleanLine, @"(\*\*.*?\*\*)");
+
+            foreach (var part in parts)
+            {
+                if (part.StartsWith("**") && part.EndsWith("**"))
                 {
-                    StatusText.Text = "Error: Could not extract text.";
-                    BtnIngest.IsEnabled = true;
-                    return;
+                    // Remove asterisks and make bold
+                    string content = part.Substring(2, part.Length - 4);
+                    textBlock.Inlines.Add(new Run(content) { FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(0, 255, 65)) }); // Neon Green for bold
                 }
-
-                // 3. Chunk and Embed
-                var chunks = _pdfParser.ChunkText(fullText).ToList();
-                int count = 0;
-
-                StatusText.Text = $"Embedding {chunks.Count} chunks...";
-
-                foreach (var chunk in chunks)
+                else
                 {
-                    float[] embedding = await _embeddingService.GenerateEmbeddingAsync(chunk);
-                    if (embedding.Length > 0)
-                    {
-                        await _vectorDb.InsertChunkAsync(chunk, embedding);
-                        count++;
-                    }
+                    textBlock.Inlines.Add(new Run(part));
                 }
+            }
 
-                StatusText.Text = $"Ingestion Complete! ({count} chunks)";
-                MessageBox.Show($"Successfully indexed {count} chunks from PDF.\nKuroko now knows your resume.");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Ingestion Error: {ex.Message}");
-                StatusText.Text = "Ingestion Failed";
-            }
-            finally
-            {
-                BtnIngest.IsEnabled = true;
-            }
+            MarkdownContainer.Children.Add(textBlock);
         }
     }
 
-    // --- MAIN TRIGGER LOGIC ---
+    // --- AI TRIGGER ---
     private async void OnGlobalHotkeyPressed(object? sender, EventArgs e)
     {
         if (string.IsNullOrEmpty(_apiKey))
         {
             AiResponseOverlay.Visibility = Visibility.Visible;
-            AiResponseText.Text = "Error: OPENROUTER_API_KEY not found in .env file.";
+            RenderMarkdown("**Error:** API Key missing in .env");
             return;
         }
 
+        // Show Loading
         AiResponseOverlay.Visibility = Visibility.Visible;
-        AiResponseText.Text = "Kuroko is thinking...";
+        MarkdownContainer.Children.Clear();
+        var loadingText = new TextBlock { Text = "Thinking...", Foreground = Brushes.Gray, FontFamily = new FontFamily("Consolas") };
+        MarkdownContainer.Children.Add(loadingText);
 
-        // 1. Get Live Context
-        string recentTranscript = _fullTranscriptBuffer.Length > 2000
+        // Get Context
+        string context = _fullTranscriptBuffer.Length > 2000
             ? _fullTranscriptBuffer.Substring(_fullTranscriptBuffer.Length - 2000)
             : _fullTranscriptBuffer;
 
-        if (string.IsNullOrWhiteSpace(recentTranscript))
-        {
-            AiResponseText.Text = "No transcript data available yet.";
-            return;
-        }
-
-        // 2. Retrieve Relevant Resume Info (RAG)
+        // RAG Logic
         string ragContext = "";
         try
         {
-            if (_embeddingService == null) _embeddingService = new EmbeddingService(_apiKey);
-            if (_vectorDb == null)
+            if (_vectorDb != null && _embeddingService == null) _embeddingService = new EmbeddingService(_apiKey);
+            if (_vectorDb != null && !string.IsNullOrEmpty(context))
             {
-                _vectorDb = new VectorDbService();
-                await _vectorDb.InitializeAsync();
-            }
-
-            // We use the last ~500 chars of the transcript as the "Search Query"
-            // This represents the immediate topic/question being asked.
-            string query = recentTranscript.Length > 500
-                ? recentTranscript.Substring(recentTranscript.Length - 500)
-                : recentTranscript;
-
-            float[] queryVec = await _embeddingService.GenerateEmbeddingAsync(query);
-            if (queryVec.Length > 0)
-            {
-                var relevantChunks = await _vectorDb.SearchAsync(queryVec, limit: 3);
-                if (relevantChunks.Any())
+                string query = context.Length > 200 ? context.Substring(context.Length - 200) : context;
+                var vec = await _embeddingService!.GenerateEmbeddingAsync(query);
+                if (vec.Length > 0)
                 {
-                    ragContext = string.Join("\n\n", relevantChunks);
-                    // Debug indicator to show RAG was used
-                    StatusText.Text = "RAG: Context Retrieved";
+                    var results = await _vectorDb.SearchAsync(vec);
+                    ragContext = string.Join("\n", results);
                 }
             }
         }
-        catch (Exception)
-        {
-            // If RAG fails, proceed with just transcript
-            StatusText.Text = "RAG: Retrieval Failed";
-        }
+        catch { }
 
-        // 3. Call AI with Hybrid Context
         if (_aiService == null) _aiService = new AiService(_apiKey);
+        string response = await _aiService.GetInterviewAssistanceAsync(context, ragContext);
 
-        // Pass both Transcript AND the Retrieved Resume Chunks
-        string response = await _aiService.GetInterviewAssistanceAsync(recentTranscript, ragContext);
-
-        AiResponseText.Text = response;
+        RenderMarkdown(response);
     }
 
-    private void Header_MouseDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.ChangedButton == MouseButton.Left)
-            this.DragMove();
-    }
-
+    // --- STANDARD EVENTS ---
     private async void BtnStart_Click(object sender, RoutedEventArgs e)
     {
         BtnStart.IsEnabled = false;
-        BtnStart.Content = "Loading...";
-        StatusText.Text = "Loading Whisper Model...";
+        BtnStart.Content = "LOADING...";
+        StatusText.Text = "INITIALIZING";
 
         try
         {
@@ -266,81 +177,101 @@ public partial class MainWindow : Window
                 Dispatcher.Invoke(() =>
                 {
                     _fullTranscriptBuffer += text + " ";
-
                     TranscriptText.Text += $"\n> {text.Trim()}";
                     TranscriptScroller.ScrollToBottom();
                 });
             };
 
-            _audioService.OnAudioDataAvailable += (s, buffer) =>
-            {
-                float max = 0;
-                for (int i = 0; i < buffer.Length; i += 4)
-                {
-                    if (i + 4 > buffer.Length) break;
-                    float sample = BitConverter.ToSingle(buffer, i);
-                    float val = Math.Abs(sample);
-                    if (val > max) max = val;
-                }
-
-                Dispatcher.Invoke(() =>
-                {
-                    StatusText.Text = $"Listening | Vol: {(max * 100):0}%";
-                });
-            };
-
             await _transcriptionService.InitializeAsync();
-
             _audioService.StartSystemAudioCapture();
 
-            StatusText.Text = "Listening (System Audio)";
-            BtnStart.Content = "Active";
-            TranscriptText.Text = "--- Listening to System Audio ---";
+            StatusText.Text = "SYSTEM ACTIVE";
+            StatusText.Foreground = new SolidColorBrush(Color.FromRgb(0, 255, 65)); // Neon Green
+            BtnStart.Content = "RUNNING";
+            TranscriptText.Text = "> System Initialized. Listening...";
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error: {ex.Message}");
+            MessageBox.Show(ex.Message);
             BtnStart.IsEnabled = true;
-            BtnStart.Content = "Retry";
-            StatusText.Text = "Error";
+            BtnStart.Content = "RETRY";
         }
     }
 
-    private void DismissAi_Click(object sender, RoutedEventArgs e)
+    private async void BtnIngest_Click(object sender, RoutedEventArgs e)
     {
-        AiResponseOverlay.Visibility = Visibility.Collapsed;
-        AiResponseText.Text = "";
+        if (string.IsNullOrEmpty(_apiKey)) { MessageBox.Show("Missing API Key"); return; }
+
+        var dialog = new OpenFileDialog { Filter = "PDF|*.pdf" };
+        if (dialog.ShowDialog() == true)
+        {
+            StatusText.Text = "PARSING PDF...";
+            try
+            {
+                _pdfParser ??= new PdfParserService();
+                _vectorDb ??= new VectorDbService();
+                _embeddingService ??= new EmbeddingService(_apiKey);
+
+                await _vectorDb.InitializeAsync();
+                string text = _pdfParser.ExtractTextFromPdf(dialog.FileName);
+                var chunks = _pdfParser.ChunkText(text);
+
+                foreach (var chunk in chunks)
+                {
+                    var vec = await _embeddingService.GenerateEmbeddingAsync(chunk);
+                    if (vec.Length > 0) await _vectorDb.InsertChunkAsync(chunk, vec);
+                }
+                StatusText.Text = "INGESTION COMPLETE";
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
     }
 
+    private void Header_MouseDown(object sender, MouseButtonEventArgs e) { if (e.LeftButton == MouseButtonState.Pressed) DragMove(); }
+    private void DismissAi_Click(object sender, RoutedEventArgs e) { AiResponseOverlay.Visibility = Visibility.Collapsed; }
+    private void ExitButton_Click(object sender, RoutedEventArgs e) { Application.Current.Shutdown(); }
+
+    // Debug & Helpers
     private void BtnDebug_Click(object sender, RoutedEventArgs e)
     {
         if (_audioService == null) return;
-
         if (!_isDebugRecording)
         {
             string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "kuroko_debug.wav");
             _audioService.StartDebugRecording(path);
-            BtnDebug.Content = "Stop Rec";
-            BtnDebug.Background = System.Windows.Media.Brushes.Red;
             _isDebugRecording = true;
-            TranscriptText.Text += $"\n[DEBUG] Recording to: {path}";
+            BtnDebug.Content = "STOP REC";
+            BtnDebug.Foreground = Brushes.Red;
         }
         else
         {
             _audioService.StopDebugRecording();
-            BtnDebug.Content = "Rec Debug";
-            BtnDebug.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(68, 68, 68));
             _isDebugRecording = false;
-            TranscriptText.Text += "\n[DEBUG] Recording stopped.";
+            BtnDebug.Content = "REC DEBUG";
+            BtnDebug.Foreground = new SolidColorBrush(Color.FromRgb(136, 68, 68));
         }
     }
 
-    private void ExitButton_Click(object sender, RoutedEventArgs e)
+    private string LoadApiKeyFromEnv()
     {
-        _hotkeyService?.Dispose();
-        _audioService?.Dispose();
-        _transcriptionService?.Dispose();
-        _vectorDb?.Dispose();
-        Application.Current.Shutdown();
+        try
+        {
+            string path = ".env";
+            if (!File.Exists(path))
+            {
+                var d = new DirectoryInfo(Directory.GetCurrentDirectory());
+                while (d != null && !File.Exists(Path.Combine(d.FullName, ".env"))) d = d.Parent;
+                if (d != null) path = Path.Combine(d.FullName, ".env");
+            }
+            if (File.Exists(path))
+            {
+                foreach (var line in File.ReadAllLines(path))
+                {
+                    if (line.StartsWith("OPENROUTER_API_KEY=")) return line.Split('=', 2)[1].Trim();
+                }
+            }
+        }
+        catch { }
+        return "";
     }
 }

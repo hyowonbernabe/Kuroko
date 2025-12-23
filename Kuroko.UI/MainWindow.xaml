@@ -4,91 +4,164 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Kuroko.UI"
-        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
-        Title="Kuroko" Height="600" Width="400"
-        Background="#1E1E1E"
-        Topmost="True"
-        WindowStyle="None"
+        Title="Kuroko" Height="650" Width="450"
+        Background="Transparent"
         AllowsTransparency="True"
+        WindowStyle="None"
+        Topmost="True"
         ResizeMode="CanResizeWithGrip">
 
-    <Border BorderBrush="#333333" BorderThickness="1" CornerRadius="5">
+    <Window.Resources>
+
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#666"/>
+            <Setter Property="BorderBrush" Value="#333"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#333"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="White"/>
+                                <Setter Property="Foreground" Value="Black"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+
+    <Border Background="#DD080808" 
+            BorderBrush="#333" 
+            BorderThickness="1" 
+            CornerRadius="12">
+
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="40"/>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="50"/>
             </Grid.RowDefinitions>
 
-            <!-- Header -->
-            <Border Grid.Row="0" Background="#252525" CornerRadius="5,5,0,0" MouseDown="Header_MouseDown">
-                <Grid Margin="10">
-                    <TextBlock Text="Kuroko // Live Monitor" Foreground="#00FF00" FontWeight="Bold" VerticalAlignment="Center"/>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <TextBlock x:Name="StatusText" Text="Idle" Foreground="#666666" FontSize="10" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <Button Content="X" Width="20" Height="20" Padding="0" Background="Transparent" BorderBrush="Transparent" Foreground="#666666" Click="ExitButton_Click"/>
+
+            <Border Grid.Row="0" Background="Transparent" MouseDown="Header_MouseDown">
+                <Grid Margin="15,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="10" Height="10" Background="#00FF41" CornerRadius="5" Margin="0,0,10,0">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#00FF41" BlurRadius="8" ShadowDepth="0" Opacity="0.8"/>
+                            </Border.Effect>
+                        </Border>
+                        <TextBlock Text="KUROKO // SYSTEM" 
+                                   Foreground="#888" 
+                                   FontFamily="Consolas" 
+                                   FontWeight="Bold"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock x:Name="StatusText" Text="OFFLINE" Foreground="#444" FontFamily="Consolas" FontSize="10" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                        <Button Content="✕" BorderThickness="0" Foreground="#666" Click="ExitButton_Click" Padding="5,0"/>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- Main Content Area -->
-            <Grid Grid.Row="1">
-                <!-- Layer 1: Transcript Feed -->
-                <ScrollViewer x:Name="TranscriptScroller" Margin="10" VerticalScrollBarVisibility="Hidden">
-                    <TextBlock x:Name="TranscriptText" 
-                           Foreground="#DDDDDD" 
-                           FontFamily="Consolas" 
-                           FontSize="12" 
-                           TextWrapping="Wrap"
-                           Text="Waiting for audio stream..."/>
-                </ScrollViewer>
 
-                <!-- Layer 2: AI Response Overlay (Hidden by default) -->
+            <Grid Grid.Row="1" Margin="15,0,15,10">
+
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="LIVE FEED" Foreground="#333" FontFamily="Consolas" FontSize="10" Margin="0,0,0,5"/>
+
+                    <ScrollViewer Grid.Row="1" x:Name="TranscriptScroller" VerticalScrollBarVisibility="Hidden">
+                        <TextBlock x:Name="TranscriptText" 
+                                   Text="System ready. Waiting for input..." 
+                                   Foreground="#555" 
+                                   FontFamily="Consolas" 
+                                   FontSize="12" 
+                                   LineHeight="18"
+                                   TextWrapping="Wrap"/>
+                    </ScrollViewer>
+                </Grid>
+
+
                 <Border x:Name="AiResponseOverlay" 
-                        Background="#CC000000" 
                         Visibility="Collapsed" 
-                        Margin="10" 
-                        CornerRadius="5" 
-                        BorderBrush="#00FF00" 
-                        BorderThickness="1">
+                        Background="#F2111111" 
+                        BorderBrush="#00FF41" 
+                        BorderThickness="1" 
+                        CornerRadius="8"
+                        Padding="15"
+                        VerticalAlignment="Top"
+                        MaxHeight="450">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="20" ShadowDepth="5" Opacity="0.5"/>
+                    </Border.Effect>
+
                     <Grid>
-                        <ScrollViewer VerticalScrollBarVisibility="Hidden" Margin="10">
-                            <TextBlock x:Name="AiResponseText" 
-                                       Foreground="#00FF00" 
-                                       FontFamily="Segoe UI" 
-                                       FontSize="14" 
-                                       FontWeight="Bold" 
-                                       TextWrapping="Wrap"/>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+
+                        <Grid Grid.Row="0" Margin="0,0,0,15">
+                            <TextBlock Text="GENERATED INSIGHT" Foreground="#00FF41" FontFamily="Consolas" FontWeight="Bold"/>
+                            <Button Content="DISMISS [ESC]" 
+                                    HorizontalAlignment="Right" 
+                                    BorderThickness="0" 
+                                    Foreground="#666" 
+                                    FontSize="10" 
+                                    Click="DismissAi_Click"/>
+                        </Grid>
+
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
+                            <StackPanel x:Name="MarkdownContainer"/>
                         </ScrollViewer>
-                        <Button Content="Dismiss" 
-                                HorizontalAlignment="Right" 
-                                VerticalAlignment="Top" 
-                                Margin="0,5,5,0" 
-                                Width="60" 
-                                Height="20" 
-                                FontSize="10" 
-                                Click="DismissAi_Click"/>
                     </Grid>
                 </Border>
             </Grid>
 
-            <!-- Controls -->
-            <Grid Grid.Row="2" Margin="10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
 
-                <Button x:Name="BtnStart" Grid.Column="0" Content="Initialize &amp; Listen" Click="BtnStart_Click" Background="#00FF00" Foreground="Black" FontWeight="Bold"/>
+            <Border Grid.Row="2" BorderBrush="#222" BorderThickness="0,1,0,0" Margin="15,0">
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <!-- Ingest Button -->
-                <Button x:Name="BtnIngest" Grid.Column="1" Content="Upload PDF" Margin="5,0,0,0" Click="BtnIngest_Click" Background="#0088FF" Foreground="White" FontSize="10"/>
+                    <StackPanel Orientation="Horizontal" Grid.Column="0">
+                        <Button x:Name="BtnStart" Content="INITIALIZE" Click="BtnStart_Click" Margin="0,0,10,0"/>
+                        <Button x:Name="BtnIngest" Content="UPLOAD PDF" Click="BtnIngest_Click"/>
+                    </StackPanel>
 
-                <!-- Debug Button -->
-                <Button x:Name="BtnDebug" Grid.Column="2" Content="Rec Debug" Margin="5,0,0,0" Click="BtnDebug_Click" Background="#444444" Foreground="White" FontSize="10"/>
-            </Grid>
+                    <Button x:Name="BtnDebug" Grid.Column="1" Content="REC DEBUG" Click="BtnDebug_Click" BorderBrush="#442222" Foreground="#884444"/>
+                </Grid>
+            </Border>
         </Grid>
     </Border>
 </Window>
