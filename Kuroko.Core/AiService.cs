@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
@@ -17,10 +18,9 @@ public class AiService : IDisposable
     private readonly string _modelId;
     private readonly string _systemPrompt;
 
-    // Updated default to Gemma 27B per request (Better rate limits than Gemini Flash usually)
+    // Updated default to Gemma 27B per request
     private const string DefaultModelFallback = "google/gemma-3-27b-it:free";
 
-    // Public constant so UI can access the default for "Reset" functionality
     public const string DefaultSystemPrompt = """
             You are Kuroko, an invisible interview assistant. 
             Your goal is to help the user answer interview questions naturally.
@@ -38,15 +38,37 @@ public class AiService : IDisposable
         _modelId = !string.IsNullOrWhiteSpace(modelId) ? modelId : DefaultModelFallback;
         _systemPrompt = !string.IsNullOrWhiteSpace(systemPrompt) ? systemPrompt : DefaultSystemPrompt;
 
-        _httpClient = new HttpClient
+        var handler = new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(15), // Keep connections open longer
+            EnableMultipleHttp2Connections = true
+        };
+
+        _httpClient = new HttpClient(handler)
         {
             BaseAddress = new Uri("https://openrouter.ai/api/v1/"),
-            Timeout = TimeSpan.FromSeconds(120)
+            Timeout = TimeSpan.FromSeconds(120),
+            DefaultRequestVersion = HttpVersion.Version20, // Optimization: Prefer HTTP/2
+            DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower
         };
 
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         _httpClient.DefaultRequestHeaders.Add("HTTP-Referer", "https://github.com/Kuroko-AI");
         _httpClient.DefaultRequestHeaders.Add("X-Title", "Kuroko");
+
+        // Optimization: Trigger a background warm-up to pay the SSL Handshake cost now, not later.
+        _ = WarmupConnectionAsync();
+    }
+
+    private async Task WarmupConnectionAsync()
+    {
+        try
+        {
+            // Send a lightweight HEAD request to open the socket
+            using var request = new HttpRequestMessage(HttpMethod.Head, "");
+            await _httpClient.SendAsync(request).ConfigureAwait(false);
+        }
+        catch { /* Ignore warmup failures */ }
     }
 
     public async IAsyncEnumerable<string> GetInterviewAssistanceStreamAsync(string transcript, string contextData = "", [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -85,11 +107,12 @@ public class AiService : IDisposable
             Content = new StringContent(jsonContent, Encoding.UTF8, "application/json")
         };
 
-        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        // Use ConfigureAwait(false) to avoid UI thread context switching overhead
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
         {
-            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
             // Descriptive Error Handling
             if ((int)response.StatusCode == 429)
@@ -111,12 +134,11 @@ public class AiService : IDisposable
             yield break;
         }
 
-        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
 
         string? line;
-        // Fix: Use standard read loop instead of checking .EndOfStream which can block or fail on network streams
-        while ((line = await reader.ReadLineAsync()) != null)
+        while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
