@@ -15,6 +15,7 @@ namespace Kuroko.UI;
 
 public partial class MainWindow : Window
 {
+    private const uint WDA_NONE = 0x00000000;
     private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
     // Win32 Constants for ToolWindow (Hides from Task Manager Apps list)
@@ -58,6 +59,7 @@ public partial class MainWindow : Window
     private string _decoyTitle = "Host Process";
     private string _decoyIconPath = "";
     private bool _deepStealthEnabled = false;
+    private bool _screenShareProtectionEnabled = true;
 
     public MainWindow()
     {
@@ -77,6 +79,7 @@ public partial class MainWindow : Window
             LoadSettingsFromEnv();
             RegisterHotkeys();
             ApplyDeepStealth(_deepStealthEnabled);
+            ApplyScreenShareProtection(_screenShareProtectionEnabled);
             ResetServices();
         };
 
@@ -97,6 +100,7 @@ public partial class MainWindow : Window
         };
 
         _settingsWindow.DeepStealthChanged += (s, val) => ApplyDeepStealth(val);
+        _settingsWindow.ScreenShareProtectionChanged += (s, val) => ApplyScreenShareProtection(val);
 
         _settingsWindow.ResetLayoutRequested += (s, e) => ResetWindowPositions();
     }
@@ -130,36 +134,36 @@ public partial class MainWindow : Window
     }
 
     // Helper to apply WDA_EXCLUDEFROMCAPTURE (Screen Share Stealth)
-    private void SetStealthForWindow(Window window)
+    private void SetAffinityForWindow(Window window, uint affinity)
     {
         try
         {
             var helper = new WindowInteropHelper(window);
-            // Ensure handle exists so we can apply affinity before window is shown
             if (helper.Handle == IntPtr.Zero) helper.EnsureHandle();
-            SetWindowDisplayAffinity(helper.Handle, WDA_EXCLUDEFROMCAPTURE);
+            SetWindowDisplayAffinity(helper.Handle, affinity);
         }
         catch { }
     }
 
-    private void EnableStealthMode()
+    private void ApplyScreenShareProtection(bool enable)
     {
+        _screenShareProtectionEnabled = enable;
+        uint affinity = enable ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE;
+
         // Apply to Main Window
-        var helper = new WindowInteropHelper(this);
-        if (helper.Handle == IntPtr.Zero) helper.EnsureHandle();
-        SetWindowDisplayAffinity(helper.Handle, WDA_EXCLUDEFROMCAPTURE);
+        SetAffinityForWindow(this, affinity);
 
         // Apply to Child Windows
-        if (_transcriptWindow != null) SetStealthForWindow(_transcriptWindow);
-        if (_outputWindow != null) SetStealthForWindow(_outputWindow);
-        if (_settingsWindow != null) SetStealthForWindow(_settingsWindow);
+        if (_transcriptWindow != null) SetAffinityForWindow(_transcriptWindow, affinity);
+        if (_outputWindow != null) SetAffinityForWindow(_outputWindow, affinity);
+        if (_settingsWindow != null) SetAffinityForWindow(_settingsWindow, affinity);
     }
 
     private void ApplyDeepStealth(bool enable)
     {
         _deepStealthEnabled = enable;
 
-        // 1. Toggle Taskbar Visibility (WPF Property)
+        // 1. Toggle Taskbar Visibility
         bool showInTaskbar = !enable;
         this.ShowInTaskbar = showInTaskbar;
 
@@ -167,7 +171,7 @@ public partial class MainWindow : Window
         if (_outputWindow != null) _outputWindow.ShowInTaskbar = showInTaskbar;
         if (_settingsWindow != null) _settingsWindow.ShowInTaskbar = showInTaskbar;
 
-        // 2. Apply ToolWindow Style (Win32 API)
+        // 2. Apply ToolWindow Style
         SetToolWindowStyle(this, enable);
         if (_transcriptWindow != null) SetToolWindowStyle(_transcriptWindow, enable);
         if (_outputWindow != null) SetToolWindowStyle(_outputWindow, enable);
@@ -187,13 +191,13 @@ public partial class MainWindow : Window
             catch { }
         }
 
-        // 4. Apply Title to ALL windows
+        // 4. Apply Title
         this.Title = targetTitle;
         if (_transcriptWindow != null) _transcriptWindow.Title = enable ? _decoyTitle : "Live Log";
         if (_outputWindow != null) _outputWindow.Title = enable ? _decoyTitle : "AI Output";
         if (_settingsWindow != null) _settingsWindow.Title = enable ? _decoyTitle : "Settings";
 
-        // 5. Apply Icon to ALL windows
+        // 5. Apply Icon
         this.Icon = targetIcon;
         if (_transcriptWindow != null) _transcriptWindow.Icon = targetIcon;
         if (_outputWindow != null) _outputWindow.Icon = targetIcon;
@@ -231,7 +235,6 @@ public partial class MainWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        EnableStealthMode();
         InitializeGlobalHotkeys();
         PositionToolbar();
 
@@ -257,12 +260,16 @@ public partial class MainWindow : Window
             {
                 ApplyDeepStealth(true);
             }
+
+            // Apply Screen Share Protection based on loaded settings
+            ApplyScreenShareProtection(_screenShareProtectionEnabled);
         }
         else
         {
             this.Topmost = true;
             _transcriptWindow!.Topmost = true;
             _outputWindow!.Topmost = true;
+            ApplyScreenShareProtection(true); // Default to protected
         }
     }
 
@@ -334,6 +341,8 @@ public partial class MainWindow : Window
             win.Show();
             win.Activate();
             if (_deepStealthEnabled) SetToolWindowStyle(win, true);
+            // Ensure visual stealth is enforced when showing window
+            SetAffinityForWindow(win, _screenShareProtectionEnabled ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE);
         }
     }
 
@@ -457,6 +466,7 @@ public partial class MainWindow : Window
         if (_outputWindow.Visibility != Visibility.Visible) _outputWindow.Show();
         _outputWindow.SetLoading(true);
         if (_deepStealthEnabled) SetToolWindowStyle(_outputWindow, true);
+        SetAffinityForWindow(_outputWindow, _screenShareProtectionEnabled ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE);
 
         if (string.IsNullOrEmpty(_apiKey))
         {
@@ -546,6 +556,7 @@ public partial class MainWindow : Window
                     if (k == "DECOY_ICON") _decoyIconPath = v;
 
                     if (k == "SYSTEM_PROMPT") _systemPrompt = v.Replace("\\n", "\n");
+                    if (k == "SCREEN_SHARE_PROTECTION") bool.TryParse(v, out _screenShareProtectionEnabled);
                 }
             }
         }

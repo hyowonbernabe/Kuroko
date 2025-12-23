@@ -15,6 +15,7 @@ public partial class SettingsWindow : Window
     // Events to notify Main Window
     public event EventHandler<bool>? TopMostChanged;
     public event EventHandler<bool>? DeepStealthChanged;
+    public event EventHandler<bool>? ScreenShareProtectionChanged; // New Event for OBS/Screen Share visibility
     public event EventHandler? SettingsUpdated;
     public event EventHandler<string>? ApiKeyUpdated;
     public event EventHandler? ResetLayoutRequested;
@@ -37,6 +38,9 @@ public partial class SettingsWindow : Window
             // Defaults
             ChkTopMost.IsChecked = true;
             ChkDeepStealth.IsChecked = false;
+            // Default "Hide from Screen Share" is ON (Stealth Mode). Turn OFF to record with OBS.
+            ChkScreenShareProtection.IsChecked = true;
+
             TxtDecoyTitle.Text = "Host Process";
             TxtDecoyIcon.Text = "";
             TxtSystemPrompt.Text = AiService.DefaultSystemPrompt;
@@ -55,6 +59,7 @@ public partial class SettingsWindow : Window
                 if (k == "OPENROUTER_MODEL") CmbModel.Text = v;
                 if (k == "WINDOW_TOPMOST") ChkTopMost.IsChecked = bool.Parse(v);
                 if (k == "DEEP_STEALTH") ChkDeepStealth.IsChecked = bool.Parse(v);
+                if (k == "SCREEN_SHARE_PROTECTION") ChkScreenShareProtection.IsChecked = bool.Parse(v);
 
                 if (k == "HOTKEY_TRIGGER_TXT") TxtHotkeyTrigger.Text = v;
                 if (k == "HOTKEY_PANIC_TXT") TxtHotkeyPanic.Text = v;
@@ -78,6 +83,7 @@ public partial class SettingsWindow : Window
         sb.AppendLine($"OPENROUTER_MODEL={CmbModel.Text}");
         sb.AppendLine($"WINDOW_TOPMOST={ChkTopMost.IsChecked}");
         sb.AppendLine($"DEEP_STEALTH={ChkDeepStealth.IsChecked}");
+        sb.AppendLine($"SCREEN_SHARE_PROTECTION={ChkScreenShareProtection.IsChecked}");
         sb.AppendLine($"HOTKEY_TRIGGER_TXT={TxtHotkeyTrigger.Text}");
         sb.AppendLine($"HOTKEY_PANIC_TXT={TxtHotkeyPanic.Text}");
 
@@ -114,6 +120,7 @@ public partial class SettingsWindow : Window
         SaveSettings();
         if (sender == ChkTopMost) TopMostChanged?.Invoke(this, ChkTopMost.IsChecked == true);
         if (sender == ChkDeepStealth) DeepStealthChanged?.Invoke(this, ChkDeepStealth.IsChecked == true);
+        if (sender == ChkScreenShareProtection) ScreenShareProtectionChanged?.Invoke(this, ChkScreenShareProtection.IsChecked == true);
     }
 
     private void Setting_Changed(object sender, TextChangedEventArgs e) { }
