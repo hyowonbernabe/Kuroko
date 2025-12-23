@@ -1,117 +1,235 @@
-# Kuroko (黒衣) - Stealth Interview Co-Pilot
+# Kuroko (黒衣) – Stealth Interview Co-Pilot
 
-> **"To exist without being seen. To help without being heard."**
+> *To exist without being seen. To help without being heard.*
 
 Kuroko is a high-performance, stealth-focused desktop assistant designed for technical interviews. It leverages local hardware for audio processing and RAG (Retrieval Augmented Generation) while orchestrating cloud-based LLMs for intelligence, ensuring privacy, low latency, and zero detection.
 
+---
+
 ## 🎥 Demo
 
-> *The interface visible above is seen ONLY by the user. To an interviewer viewing your screen via Zoom, Teams, or OBS, the desktop appears completely empty.*
+The interface visible above is seen **only by the user**.
+To an interviewer viewing your screen via Zoom, Teams, or OBS, the desktop appears completely empty.
+
+---
 
 ## 🧠 Engineering Methodology
 
-This project was built with three core pillars: **Invisibility**, **Latency**, and **Privacy**.
+This project was built on three core pillars:
 
-### 1. The Stealth Architecture (Anti-Detection)
+* **Invisibility**
+* **Latency**
+* **Privacy**
+
+---
+
+## 1. Stealth Architecture (Anti-Detection)
 
 Unlike browser extensions or meeting bots, Kuroko runs entirely outside the meeting context.
 
-* **Visual Invisibility**: Uses the Win32 `SetWindowDisplayAffinity` API with `WDA_EXCLUDEFROMCAPTURE`. This renders the UI strictly to the user's physical monitor, bypassing the DWM (Desktop Window Manager) bitstream sent to screen-sharing software (Zoom, Teams, OBS).
-* **Process Camouflage**: Implements `WS_EX_TOOLWINDOW` extended window styles to hide the application from the Taskbar and the "Apps" section of Task Manager, masquerading as a background system process.
-* **Decoy Strategy**: Features a configurable "Masquerade Mode" that alters the process title and icon (e.g., to "Calculator" or "Runtime Broker") at runtime to evade manual inspection.
+### Visual Invisibility
 
-### 2. Latency Optimization (The <200ms Goal)
+* Uses the Win32 `SetWindowDisplayAffinity` API with `WDA_EXCLUDEFROMCAPTURE`
+* Renders the UI strictly to the user's physical monitor
+* Bypasses the DWM bitstream sent to screen-sharing software (Zoom, Teams, OBS)
+* Toggleable for OBS recording
 
-Speed is critical for natural conversation. Every millisecond of friction was engineered out:
+### Process Camouflage
 
-* **Local Transcription**: Uses `Whisper.net` with quantization (Ggml) to run speech-to-text locally on the CPU/GPU. This eliminates the network round-trip for audio data.
-* **Network Tuning**: The `AiService` enforces **HTTP/2** and maintains a warmed-up connection pool (`SocketsHttpHandler`) to eliminate the expensive SSL/TLS handshake overhead on triggers.
-* **Streaming Pipeline**: Implements `IAsyncEnumerable` with Server-Sent Events (SSE) to render tokens to the UI the instant they arrive, rather than waiting for full generation.
-* **SIMD Vector Search**: Uses `System.Numerics.Tensors` for hardware-accelerated Cosine Similarity calculations, allowing instant retrieval from the local RAG database.
+* Uses `WS_EX_TOOLWINDOW` extended window styles
+* Hides the application from the Taskbar and Task Manager “Apps”
+* Masquerades as a background system process
 
-### 3. Local-First Privacy (RAG)
+### Decoy Strategy
 
-Sensitive data (Resumes, CVs) never leaves the user's machine permanently.
+* Configurable **Masquerade Mode**
+* Alters process title and icon at runtime
+* Examples: *Calculator*, *Runtime Broker*
+* Designed to evade manual inspection
 
-* **Ingestion**: `PdfPig` extracts text from PDF documents.
-* **Vector Store**: Data is chunked and stored in a local **SQLite** database.
-* **Retrieval**: Embeddings are generated on-the-fly. Only the specific, relevant chunks of text needed to answer a question are sent to the cloud LLM. The full resume is never exposed to the provider's training data.
+---
+
+## 2. Latency Optimization (The <200ms Goal)
+
+Speed is non-negotiable. Every millisecond was engineered out.
+
+### Producer–Consumer Audio Pipeline
+
+* Replaced standard event loops with `System.Threading.Channels`
+* Listener (Producer) slices audio via VAD and pushes to an unbounded queue
+* Composer (Consumer) transcribes in parallel
+* Guarantees zero audio loss and minimal blocking
+
+### Network Tuning
+
+* Enforces HTTP/2
+* Maintains warmed-up connection pools via `SocketsHttpHandler`
+* Eliminates repeated SSL/TLS handshake overhead
+
+### Streaming Pipeline
+
+* Uses `IAsyncEnumerable` with Server-Sent Events (SSE)
+* Tokens render instantly as they arrive
+* No waiting for full completion
+
+### SIMD Vector Search
+
+* Uses `System.Numerics.Tensors`
+* Hardware-accelerated cosine similarity
+* Instant retrieval from the local RAG database
+
+---
+
+## 3. Local-First Privacy (RAG)
+
+Sensitive data never permanently leaves the machine.
+
+### Ingestion
+
+* `PdfPig` extracts text from PDF resumes and CVs
+
+### Vector Store
+
+* Chunked and stored in a local SQLite database
+
+### Retrieval
+
+* Embeddings generated on demand
+* Only relevant chunks are sent to the cloud LLM
+* Full resume is never exposed to provider training data
+
+---
 
 ## 🛠 Tech Stack
 
-* **Language**: C# / .NET 10
-* **UI Framework**: WPF (Windows Presentation Foundation)
-* **Audio Engine**: NAudio (WASAPI Loopback Capture)
-* **Transcription**: Whisper.net (Local C++ bindings)
-* **AI Orchestration**: Semantic Kernel / Custom OpenRouter Client
-* **Database**: SQLite (w/ Vector Logic)
+* **Language:** C# / .NET 10
+* **UI Framework:** WPF (Windows Presentation Foundation)
+* **Audio Engine:** NAudio (WASAPI Loopback Capture)
+* **Transcription:** Whisper.net (local C++ bindings)
+* **AI Orchestration:** Semantic Kernel / Custom OpenRouter Client
+* **Database:** SQLite (with vector logic)
+
+---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-* **OS**: Windows 10/11 (x64)
-* **Runtime**: .NET 10 SDK
-* **Hardware**: Microphone + Speakers
+* **OS:** Windows 10/11 (x64)
+* **Runtime:** .NET 10 SDK
+* **Hardware:** Microphone + Speakers
+  Headphones recommended to prevent feedback
 
 ### Installation
 
-1. Clone the repository:
 ```bash
 git clone https://github.com/hyowonbernabe/Kuroko.git
 ```
 
+1. Open `Kuroko.sln` in Visual Studio
+2. Restore NuGet packages
+3. Create a `.env` file in the root directory
+4. Build and Run (`Ctrl + F5`)
 
-2. Open `Kuroko.sln` in **Visual Studio**.
-3. Restore NuGet packages.
-4. Create a `.env` file in the root directory (see Configuration).
-5. Build and Run (`Ctrl + F5`).
+---
 
-### Configuration (.env)
+## ⚙ Configuration (`.env`)
 
-Create a `.env` file in the project root to store your secrets and settings:
+Create a `.env` file in the project root:
 
-```ini
+```env
 OPENROUTER_API_KEY=sk-or-v1-your-key-here
 OPENROUTER_MODEL=google/gemma-3-27b-it:free
 
 # Window Behavior
 WINDOW_TOPMOST=True
 DEEP_STEALTH=False
+SCREEN_SHARE_PROTECTION=True
 
-# Hotkeys (Format: Modifiers + Key)
+# Hotkeys (Modifiers + Key)
 HOTKEY_TRIGGER_TXT=Alt + S
 HOTKEY_PANIC_TXT=Alt + Q
+HOTKEY_CLEAR_TXT=Alt + C
 
 # Masquerade (Optional)
 DECOY_TITLE=Host Process
 DECOY_ICON=
+
+# Persona (System Prompt)
+SYSTEM_PROMPT=You are Kuroko, an invisible interview assistant...
 ```
+
+---
+
+## 📦 Deployment (Building the Executable)
+
+To deploy Kuroko as a standalone `.exe` with no installer:
+
+```bash
+dotnet publish Kuroko.UI/Kuroko.UI.csproj \
+  -c Release \
+  -r win-x64 \
+  --self-contained true \
+  -p:PublishSingleFile=true \
+  -p:IncludeNativeLibrariesForSelfExtract=true
+```
+
+Output location:
+
+```
+\bin\Release\net9.0-windows\win-x64\publish\
+```
+
+---
 
 ## 🎮 Usage Guide
 
 ### 1. Initialization
 
-* Launch Kuroko. It will appear as a small toolbar at the bottom-left of your screen.
-* Click **INIT** to start the audio engine. The status will change to **ACTIVE**.
-* *Note: Ensure you are playing audio (or speaking) to verify the "Vol" meter moves.*
+* Launch Kuroko
+* Appears as a small toolbar at the bottom-left
+* Click **INITIALIZE**
+* Status changes to **ACTIVE**
+
+Ensure audio is playing or speaking to verify capture.
+
+---
 
 ### 2. Knowledge Base (RAG)
 
-* Open **SETTINGS** -> **KNOWLEDGE BASE**.
-* Click **UPLOAD PDF** and select your Resume or Technical CV.
-* Kuroko will parse, chunk, and vectorize your data into `kuroko_rag.db`.
+* Open **SYSTEM CONFIG → KNOWLEDGE BASE**
+* Upload your Resume or Technical CV (PDF)
+* Data is parsed, chunked, and stored in `kuroko_rag.db`
+* Files can be managed or wiped at any time
 
-### 3. The Interview
+---
 
-* **Trigger**: When asked a question, press **Alt + S**.
-* **Response**: Kuroko will silently capture the last 30 seconds of context + your resume data, send it to the LLM, and stream the answer to a floating overlay.
-* **Stealth**: If you need to share your screen, toggle **DEEP STEALTH** in settings. The app will vanish from the taskbar and screen-share streams immediately.
+### 3. Interview Trigger
 
-### 4. Panic Mode
+* **Trigger (Alt + S):** Capture context and stream answers
+* **Clear Context (Alt + C):** Reset transcription buffer
+* **AI Insight:** Markdown-rendered floating overlay
 
-* Press **Alt + Q** to immediately terminate the application process.
+---
+
+### 4. Customization
+
+* **Persona:** Edit the System Prompt to control behavior
+* **Stealth:**
+
+  * Toggle *Deep Stealth* to hide from Taskbar
+  * Toggle *Screen Share Protection* for OBS or Zoom
+
+---
+
+### 5. Panic Mode
+
+* Press **Alt + Q**
+* Immediately terminates the application process
+
+---
 
 ## 🛡 Disclaimer
 
-This software is intended for educational purposes and personal assistance. Users are responsible for adhering to the terms of service of any interviewing platforms or agreements they have entered into.
+This software is intended for educational purposes and personal assistance only.
+Users are responsible for complying with platform terms of service and any agreements they have entered into.
