@@ -77,8 +77,6 @@ public partial class MainWindow : Window
             LoadSettingsFromEnv();
             RegisterHotkeys();
             ApplyDeepStealth(_deepStealthEnabled);
-
-            // OPTIMIZATION: Reset all services to ensure new Keys/Models are picked up
             ResetServices();
         };
 
@@ -103,16 +101,12 @@ public partial class MainWindow : Window
         _settingsWindow.ResetLayoutRequested += (s, e) => ResetWindowPositions();
     }
 
-    // New helper to cleanly reset backend services when settings change
     private void ResetServices()
     {
         _aiService?.Dispose();
         _aiService = null;
-
-        // Dispose RAG services so they can be re-initialized with new API keys if needed
         _embeddingService?.Dispose();
         _embeddingService = null;
-
         _vectorDb?.Dispose();
         _vectorDb = null;
     }
@@ -123,22 +117,42 @@ public partial class MainWindow : Window
         try
         {
             var helper = new WindowInteropHelper(window);
-            if (helper.Handle == IntPtr.Zero) return;
+            if (helper.Handle == IntPtr.Zero) helper.EnsureHandle();
 
             int exStyle = GetWindowLong(helper.Handle, GWL_EXSTYLE);
 
             if (enable)
-            {
-                // Apply ToolWindow style (Hides from Alt-Tab and Task Manager "Apps")
                 SetWindowLong(helper.Handle, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW);
-            }
             else
-            {
-                // Remove ToolWindow style
                 SetWindowLong(helper.Handle, GWL_EXSTYLE, exStyle & ~WS_EX_TOOLWINDOW);
-            }
         }
         catch { }
+    }
+
+    // Helper to apply WDA_EXCLUDEFROMCAPTURE (Screen Share Stealth)
+    private void SetStealthForWindow(Window window)
+    {
+        try
+        {
+            var helper = new WindowInteropHelper(window);
+            // Ensure handle exists so we can apply affinity before window is shown
+            if (helper.Handle == IntPtr.Zero) helper.EnsureHandle();
+            SetWindowDisplayAffinity(helper.Handle, WDA_EXCLUDEFROMCAPTURE);
+        }
+        catch { }
+    }
+
+    private void EnableStealthMode()
+    {
+        // Apply to Main Window
+        var helper = new WindowInteropHelper(this);
+        if (helper.Handle == IntPtr.Zero) helper.EnsureHandle();
+        SetWindowDisplayAffinity(helper.Handle, WDA_EXCLUDEFROMCAPTURE);
+
+        // Apply to Child Windows
+        if (_transcriptWindow != null) SetStealthForWindow(_transcriptWindow);
+        if (_outputWindow != null) SetStealthForWindow(_outputWindow);
+        if (_settingsWindow != null) SetStealthForWindow(_settingsWindow);
     }
 
     private void ApplyDeepStealth(bool enable)
@@ -153,7 +167,7 @@ public partial class MainWindow : Window
         if (_outputWindow != null) _outputWindow.ShowInTaskbar = showInTaskbar;
         if (_settingsWindow != null) _settingsWindow.ShowInTaskbar = showInTaskbar;
 
-        // 2. Apply ToolWindow Style (Win32 API) - Forces "Background Process" status
+        // 2. Apply ToolWindow Style (Win32 API)
         SetToolWindowStyle(this, enable);
         if (_transcriptWindow != null) SetToolWindowStyle(_transcriptWindow, enable);
         if (_outputWindow != null) SetToolWindowStyle(_outputWindow, enable);
@@ -259,12 +273,6 @@ public partial class MainWindow : Window
         this.Top = workArea.Bottom - this.Height - 20;
     }
 
-    private void EnableStealthMode()
-    {
-        var helper = new WindowInteropHelper(this);
-        SetWindowDisplayAffinity(helper.Handle, WDA_EXCLUDEFROMCAPTURE);
-    }
-
     private void InitializeGlobalHotkeys()
     {
         _hotkeyService = new HotkeyService();
@@ -325,7 +333,6 @@ public partial class MainWindow : Window
         {
             win.Show();
             win.Activate();
-            // Ensure style is reapplied when window is shown
             if (_deepStealthEnabled) SetToolWindowStyle(win, true);
         }
     }
@@ -466,14 +473,12 @@ public partial class MainWindow : Window
         {
             if (File.Exists("kuroko_rag.db"))
             {
-                // OPTIMIZATION: Check if already initialized to prevent DB thrashing
                 if (_vectorDb == null)
                 {
                     _vectorDb = new VectorDbService();
                     await _vectorDb.InitializeAsync();
                 }
 
-                // Reuse embedding service instance
                 _embeddingService ??= new EmbeddingService(_apiKey);
 
                 if (!string.IsNullOrEmpty(context))
@@ -492,7 +497,6 @@ public partial class MainWindow : Window
 
         if (_aiService == null) _aiService = new AiService(_apiKey, _modelId, _systemPrompt);
 
-        // STREAMING IMPLEMENTATION
         StringBuilder fullResponse = new StringBuilder();
         bool firstChunk = true;
 
@@ -502,12 +506,10 @@ public partial class MainWindow : Window
             {
                 if (firstChunk)
                 {
-                    // Clear "Thinking..." immediately
                     _outputWindow.SetLoading(false);
                     firstChunk = false;
                 }
                 fullResponse.Append(chunk);
-                // Update UI incrementally
                 _outputWindow.RenderResponse(fullResponse.ToString());
             }
         }

@@ -4,7 +4,7 @@
         mc:Ignorable="d"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        Title="Kuroko Toolbar" Height="50" Width="520"
+        Title="Kuroko Toolbar" Height="50" Width="600"
         Background="Transparent"
         AllowsTransparency="True"
         WindowStyle="None"
@@ -70,9 +70,9 @@
             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0">
                 <Button x:Name="BtnInit" Content="INITIALIZE" Click="BtnInit_Click" FontWeight="Bold"/>
                 <Border Width="1" Height="14" Background="#333" Margin="5,0"/>
-                <Button Content="LOGS" Click="ToggleTranscript_Click"/>
-                <Button Content="AI" Click="ToggleOutput_Click"/>
-                <Button Content="SET" Click="ToggleSettings_Click"/>
+                <Button Content="LIVE TRANSCRIPT" Click="ToggleTranscript_Click"/>
+                <Button Content="AI INSIGHT" Click="ToggleOutput_Click"/>
+                <Button Content="SYSTEM CONFIG" Click="ToggleSettings_Click"/>
             </StackPanel>
 
             <!-- Exit -->
