@@ -39,6 +39,7 @@ public partial class SettingsWindow : Window
             ChkDeepStealth.IsChecked = false;
             TxtDecoyTitle.Text = "Host Process";
             TxtDecoyIcon.Text = "";
+            TxtSystemPrompt.Text = AiService.DefaultSystemPrompt;
 
             if (!File.Exists(_envPath)) return;
 
@@ -60,9 +61,12 @@ public partial class SettingsWindow : Window
 
                 if (k == "DECOY_TITLE") TxtDecoyTitle.Text = v;
                 if (k == "DECOY_ICON") TxtDecoyIcon.Text = v;
+
+                // Parse escaped newlines back to real newlines
+                if (k == "SYSTEM_PROMPT") TxtSystemPrompt.Text = v.Replace("\\n", "\n");
             }
 
-            if (string.IsNullOrEmpty(CmbModel.Text)) CmbModel.Text = "google/gemini-2.0-flash-exp:free";
+            if (string.IsNullOrEmpty(CmbModel.Text)) CmbModel.Text = "google/gemma-3-27b-it:free";
         }
         catch { }
     }
@@ -80,6 +84,9 @@ public partial class SettingsWindow : Window
         sb.AppendLine($"DECOY_TITLE={TxtDecoyTitle.Text}");
         sb.AppendLine($"DECOY_ICON={TxtDecoyIcon.Text}");
 
+        // Escape newlines for single-line storage
+        sb.AppendLine($"SYSTEM_PROMPT={TxtSystemPrompt.Text.Replace("\n", "\\n")}");
+
         File.WriteAllText(_envPath, sb.ToString());
 
         // Notify listeners
@@ -96,12 +103,19 @@ public partial class SettingsWindow : Window
         MessageBox.Show("AI Settings Saved.");
     }
 
+    private void BtnResetPrompt_Click(object sender, RoutedEventArgs e)
+    {
+        TxtSystemPrompt.Text = AiService.DefaultSystemPrompt;
+    }
+
     private void Setting_Changed(object sender, RoutedEventArgs e)
     {
         SaveSettings();
         if (sender == ChkTopMost) TopMostChanged?.Invoke(this, ChkTopMost.IsChecked == true);
         if (sender == ChkDeepStealth) DeepStealthChanged?.Invoke(this, ChkDeepStealth.IsChecked == true);
     }
+
+    private void Setting_Changed(object sender, TextChangedEventArgs e) { }
 
     private void BtnResetLayout_Click(object sender, RoutedEventArgs e)
     {
@@ -120,7 +134,6 @@ public partial class SettingsWindow : Window
         if (dlg.ShowDialog() == true)
         {
             TxtDecoyIcon.Text = dlg.FileName;
-            // No auto-save here, user must click Apply to confirm
         }
     }
 

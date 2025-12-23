@@ -3,6 +3,7 @@ using Kuroko.Core;
 using Kuroko.RAG;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -45,6 +46,7 @@ public partial class MainWindow : Window
     private string _fullTranscriptBuffer = "";
     private string _apiKey = "";
     private string _modelId = "";
+    private string _systemPrompt = "";
 
     private bool _transcriptPositioned = false;
     private bool _outputPositioned = false;
@@ -276,10 +278,11 @@ public partial class MainWindow : Window
     private void RegisterHotkeys()
     {
         _hotkeyService?.UnregisterAll();
-
+        // Trigger
         var (mod1, key1) = ParseHotkey(_hotkeyTriggerRaw, HotkeyService.MOD_ALT, HotkeyService.VK_S);
         _hotkeyService?.Register(1, mod1, key1);
 
+        // Panic
         var (mod2, key2) = ParseHotkey(_hotkeyPanicRaw, HotkeyService.MOD_ALT, HotkeyService.VK_Q);
         _hotkeyService?.Register(2, mod2, key2);
     }
@@ -446,7 +449,7 @@ public partial class MainWindow : Window
 
         if (_outputWindow.Visibility != Visibility.Visible) _outputWindow.Show();
         _outputWindow.SetLoading(true);
-        if (_deepStealthEnabled) SetToolWindowStyle(_outputWindow, true); // Ensure style applied on hotkey show
+        if (_deepStealthEnabled) SetToolWindowStyle(_outputWindow, true);
 
         if (string.IsNullOrEmpty(_apiKey))
         {
@@ -487,11 +490,32 @@ public partial class MainWindow : Window
         }
         catch { }
 
-        if (_aiService == null) _aiService = new AiService(_apiKey, _modelId);
+        if (_aiService == null) _aiService = new AiService(_apiKey, _modelId, _systemPrompt);
 
-        string response = await _aiService.GetInterviewAssistanceAsync(context, ragContext);
+        // STREAMING IMPLEMENTATION
+        StringBuilder fullResponse = new StringBuilder();
+        bool firstChunk = true;
 
-        _outputWindow.RenderResponse(response);
+        try
+        {
+            await foreach (var chunk in _aiService.GetInterviewAssistanceStreamAsync(context, ragContext))
+            {
+                if (firstChunk)
+                {
+                    // Clear "Thinking..." immediately
+                    _outputWindow.SetLoading(false);
+                    firstChunk = false;
+                }
+                fullResponse.Append(chunk);
+                // Update UI incrementally
+                _outputWindow.RenderResponse(fullResponse.ToString());
+            }
+        }
+        catch (Exception ex)
+        {
+            _outputWindow.RenderResponse($"**Error:** {ex.Message}");
+        }
+
         _fullTranscriptBuffer = "";
         _transcriptWindow?.AppendLog("\n[--- CONTEXT CLEARED (AUTO) ---]");
     }
@@ -518,6 +542,8 @@ public partial class MainWindow : Window
 
                     if (k == "DECOY_TITLE") _decoyTitle = v;
                     if (k == "DECOY_ICON") _decoyIconPath = v;
+
+                    if (k == "SYSTEM_PROMPT") _systemPrompt = v.Replace("\\n", "\n");
                 }
             }
         }

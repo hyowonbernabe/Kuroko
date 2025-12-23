@@ -1,8 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Kuroko.Core;
@@ -11,28 +15,13 @@ public class AiService : IDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly string _modelId;
+    private readonly string _systemPrompt;
 
-    // Default fallback if settings are empty
+    // Updated default to Gemma 27B per request (Better rate limits than Gemini Flash usually)
     private const string DefaultModelFallback = "google/gemma-3-27b-it:free";
 
-    public AiService(string apiKey, string? modelId = null)
-    {
-        _modelId = !string.IsNullOrWhiteSpace(modelId) ? modelId : DefaultModelFallback;
-
-        _httpClient = new HttpClient
-        {
-            BaseAddress = new Uri("https://openrouter.ai/api/v1/"),
-            Timeout = TimeSpan.FromSeconds(30)
-        };
-
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-        _httpClient.DefaultRequestHeaders.Add("HTTP-Referer", "https://github.com/Kuroko-AI");
-        _httpClient.DefaultRequestHeaders.Add("X-Title", "Kuroko");
-    }
-
-    public async Task<string> GetInterviewAssistanceAsync(string transcript, string contextData = "")
-    {
-        string systemPrompt = """
+    // Public constant so UI can access the default for "Reset" functionality
+    public const string DefaultSystemPrompt = """
             You are Kuroko, an invisible interview assistant. 
             Your goal is to help the user answer interview questions naturally.
             
@@ -44,6 +33,24 @@ public class AiService : IDisposable
             5. Keep the tone professional, confident, and conversational.
             """;
 
+    public AiService(string apiKey, string? modelId = null, string? systemPrompt = null)
+    {
+        _modelId = !string.IsNullOrWhiteSpace(modelId) ? modelId : DefaultModelFallback;
+        _systemPrompt = !string.IsNullOrWhiteSpace(systemPrompt) ? systemPrompt : DefaultSystemPrompt;
+
+        _httpClient = new HttpClient
+        {
+            BaseAddress = new Uri("https://openrouter.ai/api/v1/"),
+            Timeout = TimeSpan.FromSeconds(120)
+        };
+
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        _httpClient.DefaultRequestHeaders.Add("HTTP-Referer", "https://github.com/Kuroko-AI");
+        _httpClient.DefaultRequestHeaders.Add("X-Title", "Kuroko");
+    }
+
+    public async IAsyncEnumerable<string> GetInterviewAssistanceStreamAsync(string transcript, string contextData = "", [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
         var sb = new StringBuilder();
         if (!string.IsNullOrWhiteSpace(contextData))
         {
@@ -59,52 +66,89 @@ public class AiService : IDisposable
 
         string userPrompt = sb.ToString();
 
-        try
+        var requestBody = new
         {
-            var requestBody = new
+            model = _modelId,
+            messages = new[]
             {
-                model = _modelId,
-                messages = new[]
-                {
-                    new { role = "system", content = systemPrompt },
-                    new { role = "user", content = userPrompt }
-                },
-                temperature = 0.7,
-                max_tokens = 250
-            };
+                new { role = "system", content = _systemPrompt },
+                new { role = "user", content = userPrompt }
+            },
+            temperature = 0.7,
+            max_tokens = 250,
+            stream = true
+        };
 
-            var jsonContent = JsonSerializer.Serialize(requestBody);
-            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+        var jsonContent = JsonSerializer.Serialize(requestBody);
+        var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
+        {
+            Content = new StringContent(jsonContent, Encoding.UTF8, "application/json")
+        };
 
-            var response = await _httpClient.PostAsync("chat/completions", content);
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
-            if (!response.IsSuccessStatusCode)
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            // Descriptive Error Handling
+            if ((int)response.StatusCode == 429)
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                return $"AI Error: {response.StatusCode} - {errorContent}";
+                yield return "**API LIMIT REACHED (429)**\n\n" +
+                             "The current model is rate-limited or busy.\n" +
+                             "**Suggestion:** Go to Settings -> Intelligence and try a different model (e.g., 'mistralai/devstral-2512:free').";
             }
-
-            var jsonResponse = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(jsonResponse);
-
-            var root = doc.RootElement;
-            if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+            else if ((int)response.StatusCode == 401)
             {
-                var firstChoice = choices[0];
-                if (firstChoice.TryGetProperty("message", out var message))
+                yield return "**AUTHENTICATION ERROR (401)**\n\n" +
+                             "Your API Key is invalid or missing.\n" +
+                             "**Suggestion:** Check your key in Settings.";
+            }
+            else
+            {
+                yield return $"**AI Error ({response.StatusCode}):**\n{errorContent}";
+            }
+            yield break;
+        }
+
+        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var reader = new StreamReader(stream);
+
+        while (!reader.EndOfStream)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var line = await reader.ReadLineAsync();
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            if (line.StartsWith("data: "))
+            {
+                var data = line.Substring(6).Trim();
+                if (data == "[DONE]") break;
+
+                string? deltaContent = null;
+                try
                 {
-                    if (message.TryGetProperty("content", out var contentElement))
+                    using var doc = JsonDocument.Parse(data);
+                    if (doc.RootElement.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
                     {
-                        return contentElement.GetString() ?? "No content returned.";
+                        var choice = choices[0];
+                        if (choice.TryGetProperty("delta", out var delta))
+                        {
+                            if (delta.TryGetProperty("content", out var content))
+                            {
+                                deltaContent = content.GetString();
+                            }
+                        }
                     }
                 }
-            }
+                catch { }
 
-            return "No response generated.";
-        }
-        catch (Exception ex)
-        {
-            return $"AI Error: {ex.Message}";
+                if (!string.IsNullOrEmpty(deltaContent))
+                {
+                    yield return deltaContent;
+                }
+            }
         }
     }
 
