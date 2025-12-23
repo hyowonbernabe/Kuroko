@@ -55,5 +55,6 @@ public partial class TranscriptWindow : Window
     }
 
     private void BtnClear_Click(object sender, RoutedEventArgs e) => LogText.Text = "";
+    private void BtnClose_Click(object sender, RoutedEventArgs e) => this.Hide();
     private void Header_MouseDown(object sender, MouseButtonEventArgs e) { if (e.LeftButton == MouseButtonState.Pressed) DragMove(); }
 }

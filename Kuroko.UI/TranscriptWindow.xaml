@@ -15,8 +15,14 @@
             <Border Background="#111" CornerRadius="5,5,0,0" MouseDown="Header_MouseDown">
                 <DockPanel LastChildFill="False" Margin="10,0">
                     <TextBlock Text="LIVE TRANSCRIPT" Foreground="#666" FontFamily="Consolas" VerticalAlignment="Center"/>
+
+                    <!-- Buttons are docked Right, so the first one defined appears furthest right -->
+                    <Button Content="✕" DockPanel.Dock="Right" Click="BtnClose_Click" 
+                            Background="Transparent" Foreground="#666" BorderThickness="0" Padding="5,0"/>
+
                     <Button x:Name="BtnDebug" Content="REC DEBUG" DockPanel.Dock="Right" Click="BtnDebug_Click" 
-                            Background="Transparent" Foreground="#844" BorderThickness="0" FontFamily="Consolas" FontSize="10"/>
+                            Background="Transparent" Foreground="#844" BorderThickness="0" FontFamily="Consolas" FontSize="10" Margin="0,0,5,0"/>
+
                     <Button Content="CLR" DockPanel.Dock="Right" Click="BtnClear_Click" 
                             Background="Transparent" Foreground="#666" BorderThickness="0" FontFamily="Consolas" FontSize="10" Margin="0,0,5,0"/>
                 </DockPanel>

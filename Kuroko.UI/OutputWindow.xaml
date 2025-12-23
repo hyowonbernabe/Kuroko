@@ -16,8 +16,8 @@
                 <DockPanel LastChildFill="False" Margin="10,0">
                     <TextBlock Text="AI INSIGHT" Foreground="#00FF41" FontFamily="Consolas" FontWeight="Bold" VerticalAlignment="Center"/>
 
-                    <Button Content="HIDE" DockPanel.Dock="Right" Click="BtnHide_Click" 
-                            Background="Transparent" Foreground="#666" BorderThickness="0" FontFamily="Consolas" FontSize="10"/>
+                    <Button Content="✕" DockPanel.Dock="Right" Click="BtnClose_Click" 
+                            Background="Transparent" Foreground="#666" BorderThickness="0" Padding="5,0"/>
                 </DockPanel>
             </Border>
 

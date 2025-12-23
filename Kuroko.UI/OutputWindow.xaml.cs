@@ -60,7 +60,11 @@ public partial class OutputWindow : Window
                 if (part.StartsWith("**") && part.EndsWith("**"))
                 {
                     string content = part.Substring(2, part.Length - 4);
-                    textBlock.Inlines.Add(new Run(content) { FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(0, 255, 65)) });
+                    textBlock.Inlines.Add(new Run(content)
+                    {
+                        FontWeight = FontWeights.Bold,
+                        Foreground = new SolidColorBrush(Color.FromRgb(0, 255, 65))
+                    });
                 }
                 else
                 {
@@ -71,6 +75,10 @@ public partial class OutputWindow : Window
         }
     }
 
-    private void BtnHide_Click(object sender, RoutedEventArgs e) => this.Hide();
-    private void Header_MouseDown(object sender, MouseButtonEventArgs e) { if (e.LeftButton == MouseButtonState.Pressed) DragMove(); }
+    private void BtnClose_Click(object sender, RoutedEventArgs e) => this.Hide();
+
+    private void Header_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed) DragMove();
+    }
 }
