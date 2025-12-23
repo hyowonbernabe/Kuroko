@@ -15,6 +15,7 @@ public class TranscriptionService : IDisposable
     private WhisperProcessor? _processor;
     private WhisperFactory? _factory;
     private readonly List<byte> _buffer = new();
+    private string _lastSegmentTail = string.Empty; // Store end of last segment for de-duplication
 
     public event EventHandler<string>? OnSegmentTranscribed;
 
@@ -39,17 +40,32 @@ public class TranscriptionService : IDisposable
 
     private void OnAudioDataReceived(object? sender, byte[] data)
     {
-        lock (_buffer) _buffer.AddRange(data);
-
         var format = _captureService.CurrentFormat;
         if (format == null) return;
 
-        // Process every 2.5 seconds of audio
-        if (_buffer.Count >= format.AverageBytesPerSecond * 2.5)
+        lock (_buffer)
         {
-            var chunk = _buffer.ToArray();
-            _buffer.Clear();
-            _ = TranscribeChunk(chunk, format);
+            _buffer.AddRange(data);
+
+            // Sliding Window Logic:
+            // 1. Window Size: 3.0 seconds (Context for the AI)
+            // 2. Step Size:   2.5 seconds (How often we fire)
+            // 3. Overlap:     0.5 seconds (Prevents cut-off words at boundaries)
+
+            int bytesPerSec = format.AverageBytesPerSecond;
+            int windowBytes = bytesPerSec * 3;       // 3.0s
+            int stepBytes = (int)(bytesPerSec * 2.5); // 2.5s
+
+            if (_buffer.Count >= windowBytes)
+            {
+                // Take the full 3.0s window
+                var chunk = _buffer.GetRange(0, windowBytes).ToArray();
+
+                // Remove the "Step" (2.5s), keeping the last 0.5s for the next run
+                _buffer.RemoveRange(0, stepBytes);
+
+                _ = TranscribeChunk(chunk, format);
+            }
         }
     }
 
@@ -69,15 +85,51 @@ public class TranscriptionService : IDisposable
             if (provider.WaveFormat.Channels > 1)
                 provider = new StereoToMonoSampleProvider(provider);
 
-            var floatBuffer = new float[48000]; // 16k * 3 seconds
+            // 16kHz * 3 seconds = 48,000 samples
+            // We use a slightly larger buffer just in case of resampling variations
+            var floatBuffer = new float[50000];
             int read = provider.Read(floatBuffer, 0, floatBuffer.Length);
 
             await foreach (var segment in _processor.ProcessAsync(floatBuffer.AsMemory(0, read)))
             {
-                OnSegmentTranscribed?.Invoke(this, segment.Text);
+                string text = segment.Text.Trim();
+                if (string.IsNullOrWhiteSpace(text)) continue;
+
+                // --- Deduplication Logic ---
+                // Because of the 0.5s overlap, Whisper often re-transcribes the same word.
+                // We check if the NEW text starts with the TAIL of the OLD text.
+
+                string cleanText = RemoveOverlap(_lastSegmentTail, text);
+
+                if (!string.IsNullOrWhiteSpace(cleanText))
+                {
+                    OnSegmentTranscribed?.Invoke(this, cleanText);
+
+                    // Update tail for next time. We keep the last 20 chars approx.
+                    _lastSegmentTail = text.Length > 20 ? text.Substring(text.Length - 20) : text;
+                }
             }
         }
         catch { }
+    }
+
+    // Helper to strip duplicated words caused by sliding window
+    private string RemoveOverlap(string prevTail, string newText)
+    {
+        if (string.IsNullOrEmpty(prevTail)) return newText;
+
+        // Check for overlaps from length of tail down to 3 characters
+        for (int i = Math.Min(prevTail.Length, newText.Length); i >= 3; i--)
+        {
+            string tail = prevTail.Substring(prevTail.Length - i);
+            string head = newText.Substring(0, i);
+
+            if (tail.Equals(head, StringComparison.OrdinalIgnoreCase))
+            {
+                return newText.Substring(i).TrimStart();
+            }
+        }
+        return newText;
     }
 
     public void Dispose()
