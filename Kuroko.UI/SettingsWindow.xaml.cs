@@ -14,9 +14,10 @@ public partial class SettingsWindow : Window
 {
     // Events to notify Main Window
     public event EventHandler<bool>? TopMostChanged;
+    public event EventHandler<bool>? DeepStealthChanged; // New Event
     public event EventHandler? SettingsUpdated;
     public event EventHandler<string>? ApiKeyUpdated;
-    public event EventHandler? ResetLayoutRequested; // Restored Event
+    public event EventHandler? ResetLayoutRequested;
 
     private string _envPath;
 
@@ -34,6 +35,7 @@ public partial class SettingsWindow : Window
         {
             // Set Default if env missing
             ChkTopMost.IsChecked = true;
+            ChkDeepStealth.IsChecked = false;
 
             if (!File.Exists(_envPath)) return;
 
@@ -48,6 +50,7 @@ public partial class SettingsWindow : Window
                 if (k == "OPENROUTER_API_KEY") TxtApiKey.Password = v;
                 if (k == "OPENROUTER_MODEL") CmbModel.Text = v;
                 if (k == "WINDOW_TOPMOST") ChkTopMost.IsChecked = bool.Parse(v);
+                if (k == "DEEP_STEALTH") ChkDeepStealth.IsChecked = bool.Parse(v);
 
                 if (k == "HOTKEY_TRIGGER_TXT") TxtHotkeyTrigger.Text = v;
                 if (k == "HOTKEY_PANIC_TXT") TxtHotkeyPanic.Text = v;
@@ -64,6 +67,7 @@ public partial class SettingsWindow : Window
         sb.AppendLine($"OPENROUTER_API_KEY={TxtApiKey.Password}");
         sb.AppendLine($"OPENROUTER_MODEL={CmbModel.Text}");
         sb.AppendLine($"WINDOW_TOPMOST={ChkTopMost.IsChecked}");
+        sb.AppendLine($"DEEP_STEALTH={ChkDeepStealth.IsChecked}");
         sb.AppendLine($"HOTKEY_TRIGGER_TXT={TxtHotkeyTrigger.Text}");
         sb.AppendLine($"HOTKEY_PANIC_TXT={TxtHotkeyPanic.Text}");
 
@@ -86,6 +90,7 @@ public partial class SettingsWindow : Window
     {
         SaveSettings();
         if (sender == ChkTopMost) TopMostChanged?.Invoke(this, ChkTopMost.IsChecked == true);
+        if (sender == ChkDeepStealth) DeepStealthChanged?.Invoke(this, ChkDeepStealth.IsChecked == true);
     }
 
     private void BtnResetLayout_Click(object sender, RoutedEventArgs e)

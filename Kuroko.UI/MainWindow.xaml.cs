@@ -40,6 +40,10 @@ public partial class MainWindow : Window
     private bool _outputPositioned = false;
     private bool _settingsPositioned = false;
 
+    // Default values if env read fails
+    private string _hotkeyTriggerRaw = "Alt + S";
+    private string _hotkeyPanicRaw = "Alt + Q";
+
     public MainWindow()
     {
         InitializeComponent();
@@ -61,6 +65,8 @@ public partial class MainWindow : Window
             _aiService = null;
         };
 
+        _settingsWindow.ApiKeyUpdated += (s, key) => _apiKey = key;
+
         // --- TOP MOST LOGIC ---
         _settingsWindow.TopMostChanged += (s, val) =>
         {
@@ -70,8 +76,25 @@ public partial class MainWindow : Window
             if (_settingsWindow != null) _settingsWindow.Topmost = val;
         };
 
-        // --- RESTORED RESET LOGIC ---
+        // --- DEEP STEALTH LOGIC ---
+        _settingsWindow.DeepStealthChanged += (s, val) => ApplyDeepStealth(val);
+
+        // --- RESET LAYOUT LOGIC ---
         _settingsWindow.ResetLayoutRequested += (s, e) => ResetWindowPositions();
+    }
+
+    private void ApplyDeepStealth(bool enable)
+    {
+        // Toggle Taskbar Visibility
+        bool showInTaskbar = !enable;
+        this.ShowInTaskbar = showInTaskbar;
+
+        if (_transcriptWindow != null) _transcriptWindow.ShowInTaskbar = showInTaskbar;
+        if (_outputWindow != null) _outputWindow.ShowInTaskbar = showInTaskbar;
+        if (_settingsWindow != null) _settingsWindow.ShowInTaskbar = showInTaskbar;
+
+        // Toggle Decoy Title
+        this.Title = enable ? "Host Process" : "Kuroko Toolbar";
     }
 
     private void ResetWindowPositions()
@@ -114,14 +137,33 @@ public partial class MainWindow : Window
         PositionToolbar();
 
         string path = Path.Combine(Directory.GetCurrentDirectory(), ".env");
-        if (File.Exists(path) && File.ReadAllText(path).Contains("WINDOW_TOPMOST=False"))
+        if (File.Exists(path))
         {
-            this.Topmost = false;
-            _transcriptWindow!.Topmost = false;
-            _outputWindow!.Topmost = false;
+            string content = File.ReadAllText(path);
+
+            // Check TopMost
+            if (content.Contains("WINDOW_TOPMOST=False"))
+            {
+                this.Topmost = false;
+                _transcriptWindow!.Topmost = false;
+                _outputWindow!.Topmost = false;
+            }
+            else
+            {
+                this.Topmost = true;
+                _transcriptWindow!.Topmost = true;
+                _outputWindow!.Topmost = true;
+            }
+
+            // Check Deep Stealth
+            if (content.Contains("DEEP_STEALTH=True"))
+            {
+                ApplyDeepStealth(true);
+            }
         }
         else
         {
+            // Defaults
             this.Topmost = true;
             _transcriptWindow!.Topmost = true;
             _outputWindow!.Topmost = true;
@@ -382,11 +424,13 @@ public partial class MainWindow : Window
                     var parts = line.Split('=', 2);
                     if (parts.Length != 2) continue;
 
-                    if (parts[0].Trim() == "OPENROUTER_API_KEY") _apiKey = parts[1].Trim();
-                    if (parts[0].Trim() == "OPENROUTER_MODEL") _modelId = parts[1].Trim();
+                    var k = parts[0].Trim();
+                    var v = parts[1].Trim();
 
-                    if (parts[0].Trim() == "HOTKEY_TRIGGER_TXT") _hotkeyTriggerRaw = parts[1].Trim();
-                    if (parts[0].Trim() == "HOTKEY_PANIC_TXT") _hotkeyPanicRaw = parts[1].Trim();
+                    if (k == "OPENROUTER_API_KEY") _apiKey = v;
+                    if (k == "OPENROUTER_MODEL") _modelId = v;
+                    if (k == "HOTKEY_TRIGGER_TXT") _hotkeyTriggerRaw = v;
+                    if (k == "HOTKEY_PANIC_TXT") _hotkeyPanicRaw = v;
                 }
             }
         }
@@ -402,8 +446,4 @@ public partial class MainWindow : Window
         _settingsWindow?.Close();
         Application.Current.Shutdown();
     }
-
-    // Default values if env read fails
-    private string _hotkeyTriggerRaw = "Alt + S";
-    private string _hotkeyPanicRaw = "Alt + Q";
 }

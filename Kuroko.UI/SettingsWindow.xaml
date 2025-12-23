@@ -185,6 +185,7 @@
                     <TextBlock Text="WINDOW BEHAVIOR" Style="{StaticResource SectionHeader}" Margin="0,0,0,5"/>
                     <StackPanel Background="#11000000">
                         <CheckBox x:Name="ChkTopMost" Content="Always Top-Most" Style="{StaticResource ToggleSwitch}" IsChecked="True" Click="Setting_Changed" Margin="0,5"/>
+                        <CheckBox x:Name="ChkDeepStealth" Content="Deep Stealth (Hide Taskbar)" Style="{StaticResource ToggleSwitch}" Click="Setting_Changed" Margin="0,5"/>
                         <Button Content="RESET WINDOW LAYOUT" Click="BtnResetLayout_Click" Background="#222" Foreground="#DDD" BorderBrush="#444" Padding="5" Margin="0,5">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
