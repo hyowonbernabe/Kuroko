@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
 
 namespace Kuroko.UI;
 
@@ -15,8 +16,18 @@ public partial class MainWindow : Window
 {
     private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
+    // Win32 Constants for ToolWindow (Hides from Task Manager Apps list)
+    private const int GWL_EXSTYLE = -20;
+    private const int WS_EX_TOOLWINDOW = 0x00000080;
+
     [DllImport("user32.dll")]
     public static extern uint SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
     private AudioCaptureService? _audioService;
     private TranscriptionService? _transcriptionService;
@@ -35,14 +46,16 @@ public partial class MainWindow : Window
     private string _apiKey = "";
     private string _modelId = "";
 
-    // Track if windows have been positioned once
     private bool _transcriptPositioned = false;
     private bool _outputPositioned = false;
     private bool _settingsPositioned = false;
 
-    // Default values if env read fails
     private string _hotkeyTriggerRaw = "Alt + S";
     private string _hotkeyPanicRaw = "Alt + Q";
+
+    private string _decoyTitle = "Host Process";
+    private string _decoyIconPath = "";
+    private bool _deepStealthEnabled = false;
 
     public MainWindow()
     {
@@ -61,13 +74,19 @@ public partial class MainWindow : Window
         {
             LoadSettingsFromEnv();
             RegisterHotkeys();
+            ApplyDeepStealth(_deepStealthEnabled);
             _aiService?.Dispose();
             _aiService = null;
         };
 
+        _settingsWindow.DecoyUpdated += (s, e) =>
+        {
+            LoadSettingsFromEnv();
+            ApplyDeepStealth(_deepStealthEnabled);
+        };
+
         _settingsWindow.ApiKeyUpdated += (s, key) => _apiKey = key;
 
-        // --- TOP MOST LOGIC ---
         _settingsWindow.TopMostChanged += (s, val) =>
         {
             this.Topmost = val;
@@ -76,16 +95,40 @@ public partial class MainWindow : Window
             if (_settingsWindow != null) _settingsWindow.Topmost = val;
         };
 
-        // --- DEEP STEALTH LOGIC ---
         _settingsWindow.DeepStealthChanged += (s, val) => ApplyDeepStealth(val);
 
-        // --- RESET LAYOUT LOGIC ---
         _settingsWindow.ResetLayoutRequested += (s, e) => ResetWindowPositions();
+    }
+
+    // Helper to apply WS_EX_TOOLWINDOW style
+    private void SetToolWindowStyle(Window window, bool enable)
+    {
+        try
+        {
+            var helper = new WindowInteropHelper(window);
+            if (helper.Handle == IntPtr.Zero) return;
+
+            int exStyle = GetWindowLong(helper.Handle, GWL_EXSTYLE);
+
+            if (enable)
+            {
+                // Apply ToolWindow style (Hides from Alt-Tab and Task Manager "Apps")
+                SetWindowLong(helper.Handle, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW);
+            }
+            else
+            {
+                // Remove ToolWindow style
+                SetWindowLong(helper.Handle, GWL_EXSTYLE, exStyle & ~WS_EX_TOOLWINDOW);
+            }
+        }
+        catch { }
     }
 
     private void ApplyDeepStealth(bool enable)
     {
-        // Toggle Taskbar Visibility
+        _deepStealthEnabled = enable;
+
+        // 1. Toggle Taskbar Visibility (WPF Property)
         bool showInTaskbar = !enable;
         this.ShowInTaskbar = showInTaskbar;
 
@@ -93,18 +136,45 @@ public partial class MainWindow : Window
         if (_outputWindow != null) _outputWindow.ShowInTaskbar = showInTaskbar;
         if (_settingsWindow != null) _settingsWindow.ShowInTaskbar = showInTaskbar;
 
-        // Toggle Decoy Title
-        this.Title = enable ? "Host Process" : "Kuroko Toolbar";
+        // 2. Apply ToolWindow Style (Win32 API) - Forces "Background Process" status
+        SetToolWindowStyle(this, enable);
+        if (_transcriptWindow != null) SetToolWindowStyle(_transcriptWindow, enable);
+        if (_outputWindow != null) SetToolWindowStyle(_outputWindow, enable);
+        if (_settingsWindow != null) SetToolWindowStyle(_settingsWindow, enable);
+
+        // 3. Resolve Decoy Assets
+        string targetTitle = enable ? _decoyTitle : "Kuroko Toolbar";
+        ImageSource? targetIcon = null;
+
+        if (enable && !string.IsNullOrEmpty(_decoyIconPath) && File.Exists(_decoyIconPath))
+        {
+            try
+            {
+                Uri iconUri = new Uri(_decoyIconPath, UriKind.Absolute);
+                targetIcon = new BitmapImage(iconUri);
+            }
+            catch { }
+        }
+
+        // 4. Apply Title to ALL windows
+        this.Title = targetTitle;
+        if (_transcriptWindow != null) _transcriptWindow.Title = enable ? _decoyTitle : "Live Log";
+        if (_outputWindow != null) _outputWindow.Title = enable ? _decoyTitle : "AI Output";
+        if (_settingsWindow != null) _settingsWindow.Title = enable ? _decoyTitle : "Settings";
+
+        // 5. Apply Icon to ALL windows
+        this.Icon = targetIcon;
+        if (_transcriptWindow != null) _transcriptWindow.Icon = targetIcon;
+        if (_outputWindow != null) _outputWindow.Icon = targetIcon;
+        if (_settingsWindow != null) _settingsWindow.Icon = targetIcon;
     }
 
     private void ResetWindowPositions()
     {
         var area = SystemParameters.WorkArea;
 
-        // Reset Toolbar
         PositionToolbar();
 
-        // Reset Transcript (Top Left)
         if (_transcriptWindow != null)
         {
             _transcriptWindow.Left = area.Left + 20;
@@ -112,7 +182,6 @@ public partial class MainWindow : Window
             _transcriptPositioned = true;
         }
 
-        // Reset Output (Next to Transcript)
         if (_outputWindow != null)
         {
             _outputWindow.Left = area.Left + 20 + 350 + 10;
@@ -120,7 +189,6 @@ public partial class MainWindow : Window
             _outputPositioned = true;
         }
 
-        // Reset Settings (Top Right)
         if (_settingsWindow != null)
         {
             _settingsWindow.Left = area.Right - 400 - 20;
@@ -141,7 +209,6 @@ public partial class MainWindow : Window
         {
             string content = File.ReadAllText(path);
 
-            // Check TopMost
             if (content.Contains("WINDOW_TOPMOST=False"))
             {
                 this.Topmost = false;
@@ -155,7 +222,6 @@ public partial class MainWindow : Window
                 _outputWindow!.Topmost = true;
             }
 
-            // Check Deep Stealth
             if (content.Contains("DEEP_STEALTH=True"))
             {
                 ApplyDeepStealth(true);
@@ -163,7 +229,6 @@ public partial class MainWindow : Window
         }
         else
         {
-            // Defaults
             this.Topmost = true;
             _transcriptWindow!.Topmost = true;
             _outputWindow!.Topmost = true;
@@ -196,11 +261,10 @@ public partial class MainWindow : Window
     private void RegisterHotkeys()
     {
         _hotkeyService?.UnregisterAll();
-        // Trigger
+
         var (mod1, key1) = ParseHotkey(_hotkeyTriggerRaw, HotkeyService.MOD_ALT, HotkeyService.VK_S);
         _hotkeyService?.Register(1, mod1, key1);
 
-        // Panic
         var (mod2, key2) = ParseHotkey(_hotkeyPanicRaw, HotkeyService.MOD_ALT, HotkeyService.VK_Q);
         _hotkeyService?.Register(2, mod2, key2);
     }
@@ -235,8 +299,6 @@ public partial class MainWindow : Window
         return (mod, key);
     }
 
-    // --- WINDOW POSITIONING LOGIC ---
-
     private void ToggleWindow(Window? win)
     {
         if (win == null) return;
@@ -245,6 +307,8 @@ public partial class MainWindow : Window
         {
             win.Show();
             win.Activate();
+            // Ensure style is reapplied when window is shown
+            if (_deepStealthEnabled) SetToolWindowStyle(win, true);
         }
     }
 
@@ -283,8 +347,6 @@ public partial class MainWindow : Window
         }
         ToggleWindow(_settingsWindow);
     }
-
-    // --- MAIN LOGIC ---
 
     private async void BtnInit_Click(object sender, RoutedEventArgs e)
     {
@@ -369,6 +431,7 @@ public partial class MainWindow : Window
 
         if (_outputWindow.Visibility != Visibility.Visible) _outputWindow.Show();
         _outputWindow.SetLoading(true);
+        if (_deepStealthEnabled) SetToolWindowStyle(_outputWindow, true); // Ensure style applied on hotkey show
 
         if (string.IsNullOrEmpty(_apiKey))
         {
@@ -431,6 +494,9 @@ public partial class MainWindow : Window
                     if (k == "OPENROUTER_MODEL") _modelId = v;
                     if (k == "HOTKEY_TRIGGER_TXT") _hotkeyTriggerRaw = v;
                     if (k == "HOTKEY_PANIC_TXT") _hotkeyPanicRaw = v;
+
+                    if (k == "DECOY_TITLE") _decoyTitle = v;
+                    if (k == "DECOY_ICON") _decoyIconPath = v;
                 }
             }
         }

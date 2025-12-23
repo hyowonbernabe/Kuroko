@@ -14,10 +14,11 @@ public partial class SettingsWindow : Window
 {
     // Events to notify Main Window
     public event EventHandler<bool>? TopMostChanged;
-    public event EventHandler<bool>? DeepStealthChanged; // New Event
+    public event EventHandler<bool>? DeepStealthChanged;
     public event EventHandler? SettingsUpdated;
     public event EventHandler<string>? ApiKeyUpdated;
     public event EventHandler? ResetLayoutRequested;
+    public event EventHandler? DecoyUpdated;
 
     private string _envPath;
 
@@ -33,9 +34,11 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            // Set Default if env missing
+            // Defaults
             ChkTopMost.IsChecked = true;
             ChkDeepStealth.IsChecked = false;
+            TxtDecoyTitle.Text = "Host Process";
+            TxtDecoyIcon.Text = "";
 
             if (!File.Exists(_envPath)) return;
 
@@ -54,6 +57,9 @@ public partial class SettingsWindow : Window
 
                 if (k == "HOTKEY_TRIGGER_TXT") TxtHotkeyTrigger.Text = v;
                 if (k == "HOTKEY_PANIC_TXT") TxtHotkeyPanic.Text = v;
+
+                if (k == "DECOY_TITLE") TxtDecoyTitle.Text = v;
+                if (k == "DECOY_ICON") TxtDecoyIcon.Text = v;
             }
 
             if (string.IsNullOrEmpty(CmbModel.Text)) CmbModel.Text = "google/gemini-2.0-flash-exp:free";
@@ -71,11 +77,15 @@ public partial class SettingsWindow : Window
         sb.AppendLine($"HOTKEY_TRIGGER_TXT={TxtHotkeyTrigger.Text}");
         sb.AppendLine($"HOTKEY_PANIC_TXT={TxtHotkeyPanic.Text}");
 
+        sb.AppendLine($"DECOY_TITLE={TxtDecoyTitle.Text}");
+        sb.AppendLine($"DECOY_ICON={TxtDecoyIcon.Text}");
+
         File.WriteAllText(_envPath, sb.ToString());
 
         // Notify listeners
         SettingsUpdated?.Invoke(this, EventArgs.Empty);
         ApiKeyUpdated?.Invoke(this, TxtApiKey.Password);
+        DecoyUpdated?.Invoke(this, EventArgs.Empty);
     }
 
     // --- EVENT HANDLERS ---
@@ -96,6 +106,30 @@ public partial class SettingsWindow : Window
     private void BtnResetLayout_Click(object sender, RoutedEventArgs e)
     {
         ResetLayoutRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void BtnApplyDecoy_Click(object sender, RoutedEventArgs e)
+    {
+        SaveSettings();
+        MessageBox.Show("Decoy Settings Applied.");
+    }
+
+    private void BtnBrowseIcon_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog { Filter = "Icon Files|*.ico;*.png;*.jpg" };
+        if (dlg.ShowDialog() == true)
+        {
+            TxtDecoyIcon.Text = dlg.FileName;
+            // No auto-save here, user must click Apply to confirm
+        }
+    }
+
+    private void BtnResetDecoy_Click(object sender, RoutedEventArgs e)
+    {
+        TxtDecoyTitle.Text = "Host Process";
+        TxtDecoyIcon.Text = "";
+        SaveSettings();
+        MessageBox.Show("Decoy Reset to Default.");
     }
 
     // --- HOTKEY CAPTURE ---
