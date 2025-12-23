@@ -16,6 +16,7 @@ public partial class SettingsWindow : Window
     public event EventHandler<bool>? TopMostChanged;
     public event EventHandler? SettingsUpdated;
     public event EventHandler<string>? ApiKeyUpdated;
+    public event EventHandler? ResetLayoutRequested; // New Event
 
     private string _envPath;
 
@@ -85,6 +86,11 @@ public partial class SettingsWindow : Window
     {
         SaveSettings();
         if (sender == ChkTopMost) TopMostChanged?.Invoke(this, ChkTopMost.IsChecked == true);
+    }
+
+    private void BtnResetLayout_Click(object sender, RoutedEventArgs e)
+    {
+        ResetLayoutRequested?.Invoke(this, EventArgs.Empty);
     }
 
     // --- HOTKEY CAPTURE ---

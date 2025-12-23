@@ -69,6 +69,9 @@ public partial class MainWindow : Window
             if (_outputWindow != null) _outputWindow.Topmost = val;
             if (_settingsWindow != null) _settingsWindow.Topmost = val;
         };
+
+        // --- RESET LAYOUT LOGIC ---
+        _settingsWindow.ResetLayoutRequested += (s, e) => ResetWindowPositions();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -98,6 +101,38 @@ public partial class MainWindow : Window
         var workArea = SystemParameters.WorkArea;
         this.Left = workArea.Left + 20;
         this.Top = workArea.Bottom - this.Height - 20;
+    }
+
+    private void ResetWindowPositions()
+    {
+        var area = SystemParameters.WorkArea;
+
+        // Reset Toolbar
+        PositionToolbar();
+
+        // Reset Transcript (Top Left)
+        if (_transcriptWindow != null)
+        {
+            _transcriptWindow.Left = area.Left + 20;
+            _transcriptWindow.Top = area.Top + 20;
+            _transcriptPositioned = true;
+        }
+
+        // Reset Output (Next to Transcript)
+        if (_outputWindow != null)
+        {
+            _outputWindow.Left = area.Left + 20 + 350 + 10;
+            _outputWindow.Top = area.Top + 20;
+            _outputPositioned = true;
+        }
+
+        // Reset Settings (Top Right)
+        if (_settingsWindow != null)
+        {
+            _settingsWindow.Left = area.Right - 400 - 20;
+            _settingsWindow.Top = area.Top + 20;
+            _settingsPositioned = true;
+        }
     }
 
     private void EnableStealthMode()
@@ -142,7 +177,6 @@ public partial class MainWindow : Window
     {
         if (!_transcriptPositioned && _transcriptWindow != null)
         {
-            // Default: Top Left
             var area = SystemParameters.WorkArea;
             _transcriptWindow.Left = area.Left + 20;
             _transcriptWindow.Top = area.Top + 20;
@@ -155,8 +189,6 @@ public partial class MainWindow : Window
     {
         if (!_outputPositioned && _outputWindow != null)
         {
-            // Default: Next to Transcript (Top Left + Transcript Width + Padding)
-            // Assuming Transcript Width is 350
             var area = SystemParameters.WorkArea;
             _outputWindow.Left = area.Left + 20 + 350 + 10;
             _outputWindow.Top = area.Top + 20;
@@ -169,9 +201,7 @@ public partial class MainWindow : Window
     {
         if (!_settingsPositioned && _settingsWindow != null)
         {
-            // Default: Top Right
             var area = SystemParameters.WorkArea;
-            // Assuming Settings Width is 400
             _settingsWindow.Left = area.Right - 400 - 20;
             _settingsWindow.Top = area.Top + 20;
             _settingsPositioned = true;
