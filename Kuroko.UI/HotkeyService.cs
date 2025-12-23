@@ -7,7 +7,6 @@ public class HotkeyService : IDisposable
 {
     private const uint WM_HOTKEY = 0x0312;
 
-    // Win32 Modifiers
     public const uint MOD_NONE = 0x0000;
     public const uint MOD_ALT = 0x0001;
     public const uint MOD_CONTROL = 0x0002;
@@ -15,9 +14,9 @@ public class HotkeyService : IDisposable
     public const uint MOD_WIN = 0x0008;
     public const uint MOD_NOREPEAT = 0x4000;
 
-    // Default Virtual Keys (Required for Main Window fallbacks)
     public const uint VK_S = 0x53;
     public const uint VK_Q = 0x51;
+    public const uint VK_C = 0x43;
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -42,7 +41,6 @@ public class HotkeyService : IDisposable
     {
         if (_windowHandle == IntPtr.Zero) return false;
 
-        // Try unregistering first to be safe
         UnregisterHotKey(_windowHandle, id);
 
         bool success = RegisterHotKey(_windowHandle, id, modifier | MOD_NOREPEAT, vk);
@@ -73,7 +71,7 @@ public class HotkeyService : IDisposable
             if (_registeredIds.Contains(id))
             {
                 HotkeyPressed?.Invoke(this, id);
-                handled = true; // Prevent Windows "Beep"
+                handled = true;
             }
         }
         return IntPtr.Zero;

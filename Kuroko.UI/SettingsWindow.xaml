@@ -185,8 +185,8 @@
                     <TextBlock Text="WINDOW BEHAVIOR" Style="{StaticResource SectionHeader}" Margin="0,0,0,5"/>
                     <StackPanel Background="#11000000">
                         <CheckBox x:Name="ChkTopMost" Content="Always Top-Most" Style="{StaticResource ToggleSwitch}" IsChecked="True" Click="Setting_Changed" Margin="0,5"/>
-                        <CheckBox x:Name="ChkScreenShareProtection" Content="Hide from Screen Share" Style="{StaticResource ToggleSwitch}" Click="Setting_Changed" Margin="0,5"/>
                         <CheckBox x:Name="ChkDeepStealth" Content="Deep Stealth (Masquerade)" Style="{StaticResource ToggleSwitch}" Click="Setting_Changed" Margin="0,5"/>
+                        <CheckBox x:Name="ChkScreenShareProtection" Content="Hide from Screen Share (OBS)" Style="{StaticResource ToggleSwitch}" Click="Setting_Changed" Margin="0,5"/>
 
                         <!-- Decoy Settings -->
                         <StackPanel Margin="20,5,0,5" IsEnabled="{Binding IsChecked, ElementName=ChkDeepStealth}">
@@ -294,6 +294,9 @@
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Trigger AI" Foreground="#666" FontSize="10" FontFamily="Consolas"/>
                             <TextBox x:Name="TxtHotkeyTrigger" Text="Alt + S" IsReadOnly="True" PreviewKeyDown="Hotkeybox_KeyDown" Tag="Trigger"/>
+
+                            <TextBlock Text="Clear Context" Foreground="#666" FontSize="10" FontFamily="Consolas" Margin="0,5,0,0"/>
+                            <TextBox x:Name="TxtHotkeyClear" Text="Alt + C" IsReadOnly="True" PreviewKeyDown="Hotkeybox_KeyDown" Tag="Clear"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
                             <TextBlock Text="Panic (Exit)" Foreground="#666" FontSize="10" FontFamily="Consolas"/>

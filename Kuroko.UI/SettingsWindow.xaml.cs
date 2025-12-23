@@ -15,7 +15,7 @@ public partial class SettingsWindow : Window
     // Events to notify Main Window
     public event EventHandler<bool>? TopMostChanged;
     public event EventHandler<bool>? DeepStealthChanged;
-    public event EventHandler<bool>? ScreenShareProtectionChanged; // New Event for OBS/Screen Share visibility
+    public event EventHandler<bool>? ScreenShareProtectionChanged;
     public event EventHandler? SettingsUpdated;
     public event EventHandler<string>? ApiKeyUpdated;
     public event EventHandler? ResetLayoutRequested;
@@ -38,7 +38,6 @@ public partial class SettingsWindow : Window
             // Defaults
             ChkTopMost.IsChecked = true;
             ChkDeepStealth.IsChecked = false;
-            // Default "Hide from Screen Share" is ON (Stealth Mode). Turn OFF to record with OBS.
             ChkScreenShareProtection.IsChecked = true;
 
             TxtDecoyTitle.Text = "Host Process";
@@ -63,6 +62,7 @@ public partial class SettingsWindow : Window
 
                 if (k == "HOTKEY_TRIGGER_TXT") TxtHotkeyTrigger.Text = v;
                 if (k == "HOTKEY_PANIC_TXT") TxtHotkeyPanic.Text = v;
+                if (k == "HOTKEY_CLEAR_TXT") TxtHotkeyClear.Text = v;
 
                 if (k == "DECOY_TITLE") TxtDecoyTitle.Text = v;
                 if (k == "DECOY_ICON") TxtDecoyIcon.Text = v;
@@ -84,13 +84,15 @@ public partial class SettingsWindow : Window
         sb.AppendLine($"WINDOW_TOPMOST={ChkTopMost.IsChecked}");
         sb.AppendLine($"DEEP_STEALTH={ChkDeepStealth.IsChecked}");
         sb.AppendLine($"SCREEN_SHARE_PROTECTION={ChkScreenShareProtection.IsChecked}");
+
         sb.AppendLine($"HOTKEY_TRIGGER_TXT={TxtHotkeyTrigger.Text}");
         sb.AppendLine($"HOTKEY_PANIC_TXT={TxtHotkeyPanic.Text}");
+        sb.AppendLine($"HOTKEY_CLEAR_TXT={TxtHotkeyClear.Text}");
 
         sb.AppendLine($"DECOY_TITLE={TxtDecoyTitle.Text}");
         sb.AppendLine($"DECOY_ICON={TxtDecoyIcon.Text}");
 
-        // Fix: Remove \r before escaping \n to prevent unintentional line breaks in .env
+        // Remove \r and escape \n to prevent unintentional line breaks in .env
         string sanitizedPrompt = TxtSystemPrompt.Text.Replace("\r", "").Replace("\n", "\\n");
         sb.AppendLine($"SYSTEM_PROMPT={sanitizedPrompt}");
 

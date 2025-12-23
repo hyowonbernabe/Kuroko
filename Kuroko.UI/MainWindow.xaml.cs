@@ -18,7 +18,6 @@ public partial class MainWindow : Window
     private const uint WDA_NONE = 0x00000000;
     private const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
-    // Win32 Constants for ToolWindow (Hides from Task Manager Apps list)
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_TOOLWINDOW = 0x00000080;
 
@@ -35,7 +34,6 @@ public partial class MainWindow : Window
     private TranscriptionService? _transcriptionService;
     private HotkeyService? _hotkeyService;
     private AiService? _aiService;
-
     private VectorDbService? _vectorDb;
     private EmbeddingService? _embeddingService;
 
@@ -55,6 +53,7 @@ public partial class MainWindow : Window
 
     private string _hotkeyTriggerRaw = "Alt + S";
     private string _hotkeyPanicRaw = "Alt + Q";
+    private string _hotkeyClearRaw = "Alt + C";
 
     private string _decoyTitle = "Host Process";
     private string _decoyIconPath = "";
@@ -101,7 +100,6 @@ public partial class MainWindow : Window
 
         _settingsWindow.DeepStealthChanged += (s, val) => ApplyDeepStealth(val);
         _settingsWindow.ScreenShareProtectionChanged += (s, val) => ApplyScreenShareProtection(val);
-
         _settingsWindow.ResetLayoutRequested += (s, e) => ResetWindowPositions();
     }
 
@@ -115,7 +113,6 @@ public partial class MainWindow : Window
         _vectorDb = null;
     }
 
-    // Helper to apply WS_EX_TOOLWINDOW style
     private void SetToolWindowStyle(Window window, bool enable)
     {
         try
@@ -133,7 +130,6 @@ public partial class MainWindow : Window
         catch { }
     }
 
-    // Helper to apply WDA_EXCLUDEFROMCAPTURE (Screen Share Stealth)
     private void SetAffinityForWindow(Window window, uint affinity)
     {
         try
@@ -150,10 +146,7 @@ public partial class MainWindow : Window
         _screenShareProtectionEnabled = enable;
         uint affinity = enable ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE;
 
-        // Apply to Main Window
         SetAffinityForWindow(this, affinity);
-
-        // Apply to Child Windows
         if (_transcriptWindow != null) SetAffinityForWindow(_transcriptWindow, affinity);
         if (_outputWindow != null) SetAffinityForWindow(_outputWindow, affinity);
         if (_settingsWindow != null) SetAffinityForWindow(_settingsWindow, affinity);
@@ -163,7 +156,6 @@ public partial class MainWindow : Window
     {
         _deepStealthEnabled = enable;
 
-        // 1. Toggle Taskbar Visibility
         bool showInTaskbar = !enable;
         this.ShowInTaskbar = showInTaskbar;
 
@@ -171,13 +163,11 @@ public partial class MainWindow : Window
         if (_outputWindow != null) _outputWindow.ShowInTaskbar = showInTaskbar;
         if (_settingsWindow != null) _settingsWindow.ShowInTaskbar = showInTaskbar;
 
-        // 2. Apply ToolWindow Style
         SetToolWindowStyle(this, enable);
         if (_transcriptWindow != null) SetToolWindowStyle(_transcriptWindow, enable);
         if (_outputWindow != null) SetToolWindowStyle(_outputWindow, enable);
         if (_settingsWindow != null) SetToolWindowStyle(_settingsWindow, enable);
 
-        // 3. Resolve Decoy Assets
         string targetTitle = enable ? _decoyTitle : "Kuroko Toolbar";
         ImageSource? targetIcon = null;
 
@@ -191,13 +181,11 @@ public partial class MainWindow : Window
             catch { }
         }
 
-        // 4. Apply Title
         this.Title = targetTitle;
         if (_transcriptWindow != null) _transcriptWindow.Title = enable ? _decoyTitle : "Live Log";
         if (_outputWindow != null) _outputWindow.Title = enable ? _decoyTitle : "AI Output";
         if (_settingsWindow != null) _settingsWindow.Title = enable ? _decoyTitle : "Settings";
 
-        // 5. Apply Icon
         this.Icon = targetIcon;
         if (_transcriptWindow != null) _transcriptWindow.Icon = targetIcon;
         if (_outputWindow != null) _outputWindow.Icon = targetIcon;
@@ -261,7 +249,6 @@ public partial class MainWindow : Window
                 ApplyDeepStealth(true);
             }
 
-            // Apply Screen Share Protection based on loaded settings
             ApplyScreenShareProtection(_screenShareProtectionEnabled);
         }
         else
@@ -269,7 +256,7 @@ public partial class MainWindow : Window
             this.Topmost = true;
             _transcriptWindow!.Topmost = true;
             _outputWindow!.Topmost = true;
-            ApplyScreenShareProtection(true); // Default to protected
+            ApplyScreenShareProtection(true);
         }
     }
 
@@ -293,13 +280,14 @@ public partial class MainWindow : Window
     private void RegisterHotkeys()
     {
         _hotkeyService?.UnregisterAll();
-        // Trigger
         var (mod1, key1) = ParseHotkey(_hotkeyTriggerRaw, HotkeyService.MOD_ALT, HotkeyService.VK_S);
         _hotkeyService?.Register(1, mod1, key1);
 
-        // Panic
         var (mod2, key2) = ParseHotkey(_hotkeyPanicRaw, HotkeyService.MOD_ALT, HotkeyService.VK_Q);
         _hotkeyService?.Register(2, mod2, key2);
+
+        var (mod3, key3) = ParseHotkey(_hotkeyClearRaw, HotkeyService.MOD_ALT, HotkeyService.VK_C);
+        _hotkeyService?.Register(3, mod3, key3);
     }
 
     private (uint mod, uint key) ParseHotkey(string raw, uint defaultMod, uint defaultKey)
@@ -341,7 +329,6 @@ public partial class MainWindow : Window
             win.Show();
             win.Activate();
             if (_deepStealthEnabled) SetToolWindowStyle(win, true);
-            // Ensure visual stealth is enforced when showing window
             SetAffinityForWindow(win, _screenShareProtectionEnabled ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE);
         }
     }
@@ -453,6 +440,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (id == 3)
+        {
+            _fullTranscriptBuffer = "";
+            _transcriptWindow?.AppendLog("\n[--- CONTEXT CLEARED (MANUAL) ---]");
+            return;
+        }
+
         if (_outputWindow == null) return;
 
         if (!_outputPositioned)
@@ -551,6 +545,7 @@ public partial class MainWindow : Window
                     if (k == "OPENROUTER_MODEL") _modelId = v;
                     if (k == "HOTKEY_TRIGGER_TXT") _hotkeyTriggerRaw = v;
                     if (k == "HOTKEY_PANIC_TXT") _hotkeyPanicRaw = v;
+                    if (k == "HOTKEY_CLEAR_TXT") _hotkeyClearRaw = v;
 
                     if (k == "DECOY_TITLE") _decoyTitle = v;
                     if (k == "DECOY_ICON") _decoyIconPath = v;
