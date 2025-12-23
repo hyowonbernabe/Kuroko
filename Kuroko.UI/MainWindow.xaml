@@ -4,32 +4,55 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Kuroko.UI"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
-        Title="Kuroko" Height="450" Width="800"
+        Title="Kuroko" Height="600" Width="400"
         Background="#1E1E1E"
         Topmost="True"
         WindowStyle="None"
         AllowsTransparency="True"
         ResizeMode="CanResizeWithGrip">
-    <Grid>
-        <Border BorderBrush="#00FF00" BorderThickness="2" CornerRadius="5">
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock Text="Kuroko Stealth Mode" 
-                           Foreground="White" 
-                           FontSize="24" 
-                           FontWeight="Bold" 
-                           HorizontalAlignment="Center"/>
-                <TextBlock Text="Visible to you. Invisible to OBS/Zoom." 
-                           Foreground="#AAAAAA" 
-                           FontSize="14" 
-                           HorizontalAlignment="Center" 
-                           Margin="0,10,0,0"/>
-                <Button Content="Exit App" 
-                        Width="100" 
-                        Height="30" 
-                        Margin="0,20,0,0"
-                        Click="ExitButton_Click"/>
-            </StackPanel>
-        </Border>
-    </Grid>
+
+    <Border BorderBrush="#333333" BorderThickness="1" CornerRadius="5">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0" Background="#252525" CornerRadius="5,5,0,0" MouseDown="Header_MouseDown">
+                <Grid Margin="10">
+                    <TextBlock Text="Kuroko // Live Monitor" Foreground="#00FF00" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock x:Name="StatusText" Text="Idle" Foreground="#666666" FontSize="10" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <Button Content="X" Width="20" Height="20" Padding="0" Background="Transparent" BorderBrush="Transparent" Foreground="#666666" Click="ExitButton_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Transcript Feed -->
+            <ScrollViewer x:Name="TranscriptScroller" Grid.Row="1" Margin="10" VerticalScrollBarVisibility="Hidden">
+                <TextBlock x:Name="TranscriptText" 
+                           Foreground="#DDDDDD" 
+                           FontFamily="Consolas" 
+                           FontSize="12" 
+                           TextWrapping="Wrap"
+                           Text="Waiting for audio stream..."/>
+            </ScrollViewer>
+
+            <!-- Controls -->
+            <Grid Grid.Row="2" Margin="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Name="BtnStart" Grid.Column="0" Content="Initialize &amp; Listen" Click="BtnStart_Click" Background="#00FF00" Foreground="Black" FontWeight="Bold"/>
+
+                <!-- Debug Button -->
+                <Button x:Name="BtnDebug" Grid.Column="1" Content="Rec Debug" Margin="5,0,0,0" Click="BtnDebug_Click" Background="#444444" Foreground="White" FontSize="10"/>
+            </Grid>
+        </Grid>
+    </Border>
 </Window>
