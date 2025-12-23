@@ -32,26 +32,62 @@
                 </Grid>
             </Border>
 
-            <!-- Transcript Feed -->
-            <ScrollViewer x:Name="TranscriptScroller" Grid.Row="1" Margin="10" VerticalScrollBarVisibility="Hidden">
-                <TextBlock x:Name="TranscriptText" 
+            <!-- Main Content Area -->
+            <Grid Grid.Row="1">
+                <!-- Layer 1: Transcript Feed -->
+                <ScrollViewer x:Name="TranscriptScroller" Margin="10" VerticalScrollBarVisibility="Hidden">
+                    <TextBlock x:Name="TranscriptText" 
                            Foreground="#DDDDDD" 
                            FontFamily="Consolas" 
                            FontSize="12" 
                            TextWrapping="Wrap"
                            Text="Waiting for audio stream..."/>
-            </ScrollViewer>
+                </ScrollViewer>
+
+                <!-- Layer 2: AI Response Overlay (Hidden by default) -->
+                <Border x:Name="AiResponseOverlay" 
+                        Background="#CC000000" 
+                        Visibility="Collapsed" 
+                        Margin="10" 
+                        CornerRadius="5" 
+                        BorderBrush="#00FF00" 
+                        BorderThickness="1">
+                    <Grid>
+                        <ScrollViewer VerticalScrollBarVisibility="Hidden" Margin="10">
+                            <TextBlock x:Name="AiResponseText" 
+                                       Foreground="#00FF00" 
+                                       FontFamily="Segoe UI" 
+                                       FontSize="14" 
+                                       FontWeight="Bold" 
+                                       TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                        <Button Content="Dismiss" 
+                                HorizontalAlignment="Right" 
+                                VerticalAlignment="Top" 
+                                Margin="0,5,5,0" 
+                                Width="60" 
+                                Height="20" 
+                                FontSize="10" 
+                                Click="DismissAi_Click"/>
+                    </Grid>
+                </Border>
+            </Grid>
 
             <!-- Controls -->
             <Grid Grid.Row="2" Margin="10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
+
                 <Button x:Name="BtnStart" Grid.Column="0" Content="Initialize &amp; Listen" Click="BtnStart_Click" Background="#00FF00" Foreground="Black" FontWeight="Bold"/>
 
+                <!-- Ingest Button -->
+                <Button x:Name="BtnIngest" Grid.Column="1" Content="Upload PDF" Margin="5,0,0,0" Click="BtnIngest_Click" Background="#0088FF" Foreground="White" FontSize="10"/>
+
                 <!-- Debug Button -->
-                <Button x:Name="BtnDebug" Grid.Column="1" Content="Rec Debug" Margin="5,0,0,0" Click="BtnDebug_Click" Background="#444444" Foreground="White" FontSize="10"/>
+                <Button x:Name="BtnDebug" Grid.Column="2" Content="Rec Debug" Margin="5,0,0,0" Click="BtnDebug_Click" Background="#444444" Foreground="White" FontSize="10"/>
             </Grid>
         </Grid>
     </Border>
