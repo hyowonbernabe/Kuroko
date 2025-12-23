@@ -114,11 +114,12 @@ public class AiService : IDisposable
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream);
 
-        while (!reader.EndOfStream)
+        string? line;
+        // Fix: Use standard read loop instead of checking .EndOfStream which can block or fail on network streams
+        while ((line = await reader.ReadLineAsync()) != null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var line = await reader.ReadLineAsync();
             if (string.IsNullOrWhiteSpace(line)) continue;
 
             if (line.StartsWith("data: "))
@@ -142,7 +143,7 @@ public class AiService : IDisposable
                         }
                     }
                 }
-                catch { }
+                catch { /* Ignore partial frames */ }
 
                 if (!string.IsNullOrEmpty(deltaContent))
                 {
