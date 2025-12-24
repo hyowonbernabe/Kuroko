@@ -27,12 +27,18 @@ public partial class OutputWindow : Window
                 FontSize = 14
             });
         }
+        // Force window to shrink/grow to fit "Thinking..." or empty state
+        this.SizeToContent = SizeToContent.Height;
     }
 
     public void RenderResponse(string markdown)
     {
         MarkdownContainer.Children.Clear();
-        if (string.IsNullOrWhiteSpace(markdown)) return;
+        if (string.IsNullOrWhiteSpace(markdown))
+        {
+            this.SizeToContent = SizeToContent.Height;
+            return;
+        }
 
         var lines = markdown.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
         foreach (var line in lines)
@@ -73,6 +79,10 @@ public partial class OutputWindow : Window
             }
             MarkdownContainer.Children.Add(textBlock);
         }
+
+        // Critical: Force the window to resize to fit the newly rendered content
+        // This ensures the window "hugs" the text as it streams in.
+        this.SizeToContent = SizeToContent.Height;
     }
 
     private void BtnClose_Click(object sender, RoutedEventArgs e) => this.Hide();
