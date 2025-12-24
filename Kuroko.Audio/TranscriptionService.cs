@@ -23,12 +23,18 @@ public class TranscriptionService : IDisposable
     private Task? _composerTask;
     private readonly CancellationTokenSource _cts = new();
 
-    // VAD (Voice Activity Detection) Settings
-    private const int SampleRate = 16000;
-    private const double VolumeThreshold = 0.005; // RMS Threshold for "Silence"
-    // OPTIMIZATION: Increased to 400ms to prevent cutting mid-sentence words while maintaining speed
-    private readonly TimeSpan _silenceCutoff = TimeSpan.FromMilliseconds(400);
-    private readonly TimeSpan _maxChunkDuration = TimeSpan.FromSeconds(5);
+    // Defaults (Public for UI Reset)
+    public const double DefaultSilenceCutoffMs = 1000;
+    public const double DefaultMaxChunkDurationSec = 15;
+    public const double DefaultVolumeThreshold = 0.001; // Lowered to 0.001 to prevent cutting quiet speech
+
+    // Fixed Constants
+    private const int SampleRate = 16000; // Re-added required constant
+
+    // Configurable Settings
+    private TimeSpan _silenceCutoff = TimeSpan.FromMilliseconds(DefaultSilenceCutoffMs);
+    private TimeSpan _maxChunkDuration = TimeSpan.FromSeconds(DefaultMaxChunkDurationSec);
+    private double _volumeThreshold = DefaultVolumeThreshold;
 
     // Listener State
     private DateTime _lastSpeechDetected = DateTime.Now;
@@ -45,6 +51,13 @@ public class TranscriptionService : IDisposable
         _audioQueue = Channel.CreateUnbounded<byte[]>();
     }
 
+    public void Configure(double silenceCutoffMs, double maxChunkDurationSec, double volumeThreshold)
+    {
+        _silenceCutoff = TimeSpan.FromMilliseconds(silenceCutoffMs);
+        _maxChunkDuration = TimeSpan.FromSeconds(maxChunkDurationSec);
+        _volumeThreshold = volumeThreshold;
+    }
+
     public async Task InitializeAsync()
     {
         string modelName = "ggml-base.bin";
@@ -58,12 +71,10 @@ public class TranscriptionService : IDisposable
         _factory = WhisperFactory.FromPath(modelName);
         _processor = _factory.CreateBuilder().WithLanguage("en").Build();
 
-        // OPTIMIZATION: Use LongRunning to give the Composer a dedicated thread, avoiding ThreadPool starvation
         _composerTask = Task.Factory.StartNew(ComposerLoop, _cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
     }
 
     // --- THE LISTENER (Producer) ---
-    // Runs on the audio thread. Its ONLY job is to slice audio and push to queue.
     private void OnAudioDataReceived(object? sender, byte[] data)
     {
         var format = _captureService.CurrentFormat;
@@ -86,14 +97,16 @@ public class TranscriptionService : IDisposable
             double currentDuration = _listenerBuffer.Count / bytesPerSecond;
 
             // Logic: Cut the tape if...
-            // 1. We HAD speech, but now have silence > 400ms (Natural pause)
-            // 2. OR Buffer is > 5 seconds (Safety valve to prevent huge latency)
+            // 1. We HAD speech, but now have silence > Configured Threshold (Natural pause)
+            // 2. OR Buffer is > Configured Max (Safety valve to prevent huge latency)
 
             bool silenceTimeout = _isSpeechActive && (DateTime.Now - _lastSpeechDetected) > _silenceCutoff;
             bool safetyTimeout = currentDuration > _maxChunkDuration.TotalSeconds;
 
-            // OPTIMIZATION: Lowered min threshold to 0.2s to capture short "Yes/No" answers
-            if ((silenceTimeout || safetyTimeout) && currentDuration > 0.2)
+            // OPTIMIZATION (CONTEXT): 
+            // 1. Must have at least 2.0s of audio to be worth processing (Context)
+            // 2. OR Must be a forced safety timeout (buffer full)
+            if ((silenceTimeout && currentDuration > 2.0) || safetyTimeout)
             {
                 // Create the package
                 byte[] chunk = _listenerBuffer.ToArray();
@@ -109,7 +122,6 @@ public class TranscriptionService : IDisposable
     }
 
     // --- THE COMPOSER (Consumer) ---
-    // Runs on a separate thread. Processes the queue sequentially.
     private async Task ComposerLoop()
     {
         try
@@ -161,7 +173,6 @@ public class TranscriptionService : IDisposable
             }
 
             // Feed to Whisper
-            // Since chunks are strictly sequential and non-overlapping, we blindly output whatever we get.
             await foreach (var segment in _processor.ProcessAsync(floatBuffer.AsMemory(0, samplesRead)))
             {
                 string text = segment.Text.Trim();
@@ -208,7 +219,8 @@ public class TranscriptionService : IDisposable
         }
 
         if (sampleCount == 0) return false;
-        return Math.Sqrt(sumSquares / sampleCount) > VolumeThreshold;
+        // Use the configured threshold
+        return Math.Sqrt(sumSquares / sampleCount) > _volumeThreshold;
     }
 
     public void Dispose()

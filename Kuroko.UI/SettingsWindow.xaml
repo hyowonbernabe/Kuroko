@@ -1,7 +1,7 @@
 ﻿<Window x:Class="Kuroko.UI.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Configuration" Height="750" Width="400"
+        Title="Configuration" Height="800" Width="400"
         Background="Transparent" AllowsTransparency="True" WindowStyle="None"
         Topmost="True" ResizeMode="CanResizeWithGrip">
 
@@ -109,36 +109,19 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="20"/>
                                                 </Grid.ColumnDefinitions>
-                                                <!-- Clickable area for dropdown -->
                                                 <Path Grid.Column="1" Data="M0,0 L4,4 L8,0" Fill="#666" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Grid>
                                         </Border>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                             </ToggleButton>
-
-                            <!-- Display for Selection -->
                             <ContentPresenter Name="ContentSite" IsHitTestVisible="False"  Content="{TemplateBinding SelectionBoxItem}"
                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                               ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                              Margin="5,0,25,0"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Left" />
-
-                            <!-- Editable Input Box -->
-                            <TextBox x:Name="PART_EditableTextBox"
-                                     Style="{x:Null}"
-                                     HorizontalAlignment="Left"
-                                     VerticalAlignment="Center"
-                                     Margin="5,0,25,0"
-                                     Focusable="True"
-                                     Background="Transparent"
-                                     Foreground="{TemplateBinding Foreground}"
-                                     FontFamily="{TemplateBinding FontFamily}"
-                                     Visibility="Hidden"
-                                     IsReadOnly="{Binding IsReadOnly, RelativeSource={RelativeSource TemplatedParent}}"/>
-
-                            <!-- Dropdown Popup -->
+                                              Margin="5,0,25,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                            <TextBox x:Name="PART_EditableTextBox" Style="{x:Null}" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,25,0"
+                                     Focusable="True" Background="Transparent" Foreground="{TemplateBinding Foreground}"
+                                     FontFamily="{TemplateBinding FontFamily}" Visibility="Hidden" IsReadOnly="{Binding IsReadOnly, RelativeSource={RelativeSource TemplatedParent}}"/>
                             <Popup Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
                                 <Grid Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
                                     <Border x:Name="DropDownBorder" Background="#222" BorderThickness="1" BorderBrush="#444"/>
@@ -158,7 +141,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
     </Window.Resources>
 
     <Border Background="#CC111111" BorderBrush="#333" BorderThickness="1" CornerRadius="5">
@@ -168,31 +150,25 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- Header -->
             <Border Background="#111" CornerRadius="5,5,0,0" MouseDown="Header_MouseDown">
                 <DockPanel LastChildFill="False" Margin="10,0">
                     <TextBlock Text="SYSTEM CONFIG" Foreground="#888" FontFamily="Consolas" VerticalAlignment="Center"/>
-                    <Button Content="✕" DockPanel.Dock="Right" Click="BtnClose_Click" 
-                            Background="Transparent" Foreground="#666" BorderThickness="0"/>
+                    <Button Content="✕" DockPanel.Dock="Right" Click="BtnClose_Click" Background="Transparent" Foreground="#666" BorderThickness="0"/>
                 </DockPanel>
             </Border>
 
-            <!-- Content -->
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" Margin="15">
                 <StackPanel>
 
-                    <!-- 1. Window Behavior -->
                     <TextBlock Text="WINDOW BEHAVIOR" Style="{StaticResource SectionHeader}" Margin="0,0,0,5"/>
                     <StackPanel Background="#11000000">
                         <CheckBox x:Name="ChkTopMost" Content="Always Top-Most" Style="{StaticResource ToggleSwitch}" IsChecked="True" Click="Setting_Changed" Margin="0,5"/>
                         <CheckBox x:Name="ChkDeepStealth" Content="Deep Stealth (Masquerade)" Style="{StaticResource ToggleSwitch}" Click="Setting_Changed" Margin="0,5"/>
                         <CheckBox x:Name="ChkScreenShareProtection" Content="Hide from Screen Share (OBS)" Style="{StaticResource ToggleSwitch}" Click="Setting_Changed" Margin="0,5"/>
 
-                        <!-- Decoy Settings -->
                         <StackPanel Margin="20,5,0,5" IsEnabled="{Binding IsChecked, ElementName=ChkDeepStealth}">
                             <TextBlock Text="Decoy Window Title" Foreground="#666" FontFamily="Consolas" FontSize="10"/>
                             <TextBox x:Name="TxtDecoyTitle" Margin="0,0,0,5"/>
-
                             <TextBlock Text="Decoy Icon Path (.ico)" Foreground="#666" FontFamily="Consolas" FontSize="10"/>
                             <Grid Margin="0,0,0,5">
                                 <Grid.ColumnDefinitions>
@@ -200,90 +176,62 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBox x:Name="TxtDecoyIcon" IsReadOnly="False"/>
-                                <Button Content="..." Grid.Column="1" Click="BtnBrowseIcon_Click" Background="#222" Foreground="#DDD" BorderBrush="#444" Padding="8,0" Margin="5,0,0,0">
-                                    <Button.Template>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="3">
-                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Button.Template>
-                                </Button>
+                                <Button Content="..." Grid.Column="1" Click="BtnBrowseIcon_Click" Background="#222" Foreground="#DDD" BorderBrush="#444" Padding="8,0" Margin="5,0,0,0"/>
                             </Grid>
-
                             <Grid Margin="0,5,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <Button Content="APPLY DECOY" Click="BtnApplyDecoy_Click" Background="#222" Foreground="#0F0" BorderBrush="#444" Padding="5" FontSize="10">
-                                    <Button.Template>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="3">
-                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Button.Template>
-                                </Button>
-                                <Button Content="RESET DEFAULT" Grid.Column="1" Click="BtnResetDecoy_Click" Background="#221111" Foreground="#AA6666" BorderBrush="#442222" Padding="5" Margin="5,0,0,0" FontSize="10">
-                                    <Button.Template>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="3">
-                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Button.Template>
-                                </Button>
+                                <Button Content="APPLY DECOY" Click="BtnApplyDecoy_Click" Background="#222" Foreground="#0F0" BorderBrush="#444" Padding="5" FontSize="10"/>
+                                <Button Content="RESET DEFAULT" Grid.Column="1" Click="BtnResetDecoy_Click" Background="#221111" Foreground="#AA6666" BorderBrush="#442222" Padding="5" Margin="5,0,0,0" FontSize="10"/>
                             </Grid>
                         </StackPanel>
 
-                        <Button Content="RESET WINDOW LAYOUT" Click="BtnResetLayout_Click" Background="#222" Foreground="#DDD" BorderBrush="#444" Padding="5" Margin="0,10,0,5">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="3">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
+                        <Button Content="RESET WINDOW LAYOUT" Click="BtnResetLayout_Click" Background="#222" Foreground="#DDD" BorderBrush="#444" Padding="5" Margin="0,10,0,5"/>
                     </StackPanel>
 
-                    <!-- 2. Intelligence -->
-                    <TextBlock Text="INTELLIGENCE (OPENROUTER)" Style="{StaticResource SectionHeader}"/>
+                    <!-- TRANSCRIPTION SETTINGS -->
+                    <TextBlock Text="TRANSCRIPTION ENGINE" Style="{StaticResource SectionHeader}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                            <TextBlock Text="Silence Wait (ms)" Foreground="#666" FontFamily="Consolas" FontSize="10"/>
+                            <TextBox x:Name="TxtTransSilence" Text="1000"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                            <TextBlock Text="Max Chunk (s)" Foreground="#666" FontFamily="Consolas" FontSize="10"/>
+                            <TextBox x:Name="TxtTransMax" Text="15"/>
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="Sensitivity (RMS Threshold)" Foreground="#666" FontFamily="Consolas" FontSize="10" Margin="0,5,0,0"/>
+                    <TextBox x:Name="TxtTransVol" Text="0.005" Margin="0,0,0,5"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Content="APPLY CONFIG" Click="BtnSaveAi_Click" Background="#222" Foreground="#DDD" BorderBrush="#444" Padding="5"/>
+                        <Button Content="RESET" Grid.Column="1" Click="BtnResetTrans_Click" Background="#221111" Foreground="#AA6666" BorderBrush="#442222" Padding="5" Margin="5,0,0,0" FontSize="10"/>
+                    </Grid>
 
+                    <TextBlock Text="INTELLIGENCE (OPENROUTER)" Style="{StaticResource SectionHeader}"/>
                     <TextBlock Text="API Key" Foreground="#666" FontFamily="Consolas" FontSize="10"/>
                     <PasswordBox x:Name="TxtApiKey" Margin="0,0,0,5"/>
-
                     <TextBlock Text="Model ID" Foreground="#666" FontFamily="Consolas" FontSize="10"/>
                     <ComboBox x:Name="CmbModel" IsEditable="True" Margin="0,0,0,5">
                         <ComboBoxItem Content="google/gemma-3-27b-it:free"/>
                         <ComboBoxItem Content="google/gemini-2.0-flash-exp:free"/>
                         <ComboBoxItem Content="mistralai/devstral-2512:free"/>
                     </ComboBox>
-
                     <TextBlock Text="SYSTEM PROMPT (PERSONA)" Style="{StaticResource SectionHeader}"/>
                     <TextBox x:Name="TxtSystemPrompt" Height="100" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Margin="0,0,0,5"/>
-                    <Button Content="RESET DEFAULT PROMPT" Click="BtnResetPrompt_Click" Background="#221111" Foreground="#AA6666" BorderBrush="#442222" Padding="5" Margin="0,0,0,5" HorizontalAlignment="Left" FontSize="10">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="3">
-                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
+                    <Button Content="RESET DEFAULT PROMPT" Click="BtnResetPrompt_Click" Background="#221111" Foreground="#AA6666" BorderBrush="#442222" Padding="5" Margin="0,0,0,5" HorizontalAlignment="Left" FontSize="10"/>
+                    <Button Content="SAVE AI SETTINGS" Click="BtnSaveAi_Click" Background="#222" Foreground="#DDD" BorderBrush="#444" Padding="5" Margin="0,15,0,0"/>
 
-                    <Button Content="SAVE AI SETTINGS" Click="BtnSaveAi_Click" Background="#222" Foreground="#DDD" BorderBrush="#444" Padding="5" Margin="0,15,0,0">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="3">
-                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
-
-                    <!-- 3. Hotkeys -->
                     <TextBlock Text="CONTROLS" Style="{StaticResource SectionHeader}"/>
                     <Grid Margin="0,5">
                         <Grid.ColumnDefinitions>
@@ -294,7 +242,6 @@
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Trigger AI" Foreground="#666" FontSize="10" FontFamily="Consolas"/>
                             <TextBox x:Name="TxtHotkeyTrigger" Text="Alt + S" IsReadOnly="True" PreviewKeyDown="Hotkeybox_KeyDown" Tag="Trigger"/>
-
                             <TextBlock Text="Clear Context" Foreground="#666" FontSize="10" FontFamily="Consolas" Margin="0,5,0,0"/>
                             <TextBox x:Name="TxtHotkeyClear" Text="Alt + C" IsReadOnly="True" PreviewKeyDown="Hotkeybox_KeyDown" Tag="Clear"/>
                         </StackPanel>
@@ -304,7 +251,6 @@
                         </StackPanel>
                     </Grid>
 
-                    <!-- 4. Memory (RAG) -->
                     <TextBlock Text="KNOWLEDGE BASE" Style="{StaticResource SectionHeader}"/>
                     <Border BorderBrush="#333" BorderThickness="1" Background="#080808" CornerRadius="3" MinHeight="100">
                         <Grid>
@@ -312,45 +258,23 @@
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-
-                            <!-- File List -->
                             <ItemsControl x:Name="LstFiles" Margin="5">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <DockPanel Margin="0,2">
-                                            <Button Content="✕" DockPanel.Dock="Right" 
-                                                    Click="BtnDeleteFile_Click" Tag="{Binding}"
-                                                    Background="Transparent" Foreground="#D44" BorderThickness="0" FontSize="10" Padding="5,0"/>
+                                            <Button Content="✕" DockPanel.Dock="Right" Click="BtnDeleteFile_Click" Tag="{Binding}" Background="Transparent" Foreground="#D44" BorderThickness="0" FontSize="10" Padding="5,0"/>
                                             <TextBlock Text="{Binding}" Foreground="#CCC" FontFamily="Consolas" FontSize="11" VerticalAlignment="Center"/>
                                         </DockPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-
-                            <!-- RAG Actions -->
                             <Grid Grid.Row="1" Margin="5">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <Button Content="UPLOAD PDF" Click="BtnIngest_Click" Background="#222" Foreground="#DDD" BorderBrush="#444" Padding="5">
-                                    <Button.Template>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="3">
-                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Button.Template>
-                                </Button>
-                                <Button x:Name="BtnWipe" Content="WIPE DB" Grid.Column="1" Click="BtnWipe_Click" Background="#311" Foreground="#E88" BorderBrush="#522" Margin="5,0,0,0" Padding="5">
-                                    <Button.Template>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="3">
-                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Button.Template>
-                                </Button>
+                                <Button Content="UPLOAD PDF" Click="BtnIngest_Click" Background="#222" Foreground="#DDD" BorderBrush="#444" Padding="5"/>
+                                <Button x:Name="BtnWipe" Content="WIPE DB" Grid.Column="1" Click="BtnWipe_Click" Background="#311" Foreground="#E88" BorderBrush="#522" Margin="5,0,0,0" Padding="5"/>
                             </Grid>
                         </Grid>
                     </Border>

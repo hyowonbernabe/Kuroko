@@ -1,4 +1,5 @@
-﻿using Kuroko.Core;
+﻿using Kuroko.Audio; // For TranscriptionService constants
+using Kuroko.Core;
 using Kuroko.RAG;
 using Microsoft.Win32;
 using System.IO;
@@ -44,6 +45,11 @@ public partial class SettingsWindow : Window
             TxtDecoyIcon.Text = "";
             TxtSystemPrompt.Text = AiService.DefaultSystemPrompt;
 
+            // Transcriber Defaults
+            TxtTransSilence.Text = TranscriptionService.DefaultSilenceCutoffMs.ToString();
+            TxtTransMax.Text = TranscriptionService.DefaultMaxChunkDurationSec.ToString();
+            TxtTransVol.Text = TranscriptionService.DefaultVolumeThreshold.ToString();
+
             if (!File.Exists(_envPath)) return;
 
             var lines = File.ReadAllLines(_envPath);
@@ -67,8 +73,12 @@ public partial class SettingsWindow : Window
                 if (k == "DECOY_TITLE") TxtDecoyTitle.Text = v;
                 if (k == "DECOY_ICON") TxtDecoyIcon.Text = v;
 
-                // Parse escaped newlines back to real newlines
                 if (k == "SYSTEM_PROMPT") TxtSystemPrompt.Text = v.Replace("\\n", "\n");
+
+                // Transcription
+                if (k == "TRANS_SILENCE_MS") TxtTransSilence.Text = v;
+                if (k == "TRANS_MAX_SEC") TxtTransMax.Text = v;
+                if (k == "TRANS_VOL_THRES") TxtTransVol.Text = v;
             }
 
             if (string.IsNullOrEmpty(CmbModel.Text)) CmbModel.Text = "google/gemma-3-27b-it:free";
@@ -92,29 +102,38 @@ public partial class SettingsWindow : Window
         sb.AppendLine($"DECOY_TITLE={TxtDecoyTitle.Text}");
         sb.AppendLine($"DECOY_ICON={TxtDecoyIcon.Text}");
 
-        // Remove \r and escape \n to prevent unintentional line breaks in .env
         string sanitizedPrompt = TxtSystemPrompt.Text.Replace("\r", "").Replace("\n", "\\n");
         sb.AppendLine($"SYSTEM_PROMPT={sanitizedPrompt}");
 
+        // Transcription Settings
+        sb.AppendLine($"TRANS_SILENCE_MS={TxtTransSilence.Text}");
+        sb.AppendLine($"TRANS_MAX_SEC={TxtTransMax.Text}");
+        sb.AppendLine($"TRANS_VOL_THRES={TxtTransVol.Text}");
+
         File.WriteAllText(_envPath, sb.ToString());
 
-        // Notify listeners
         SettingsUpdated?.Invoke(this, EventArgs.Empty);
         ApiKeyUpdated?.Invoke(this, TxtApiKey.Password);
         DecoyUpdated?.Invoke(this, EventArgs.Empty);
     }
 
     // --- EVENT HANDLERS ---
-
     private void BtnSaveAi_Click(object sender, RoutedEventArgs e)
     {
         SaveSettings();
-        MessageBox.Show("AI Settings Saved.");
+        MessageBox.Show("Settings Saved.");
     }
 
     private void BtnResetPrompt_Click(object sender, RoutedEventArgs e)
     {
         TxtSystemPrompt.Text = AiService.DefaultSystemPrompt;
+    }
+
+    private void BtnResetTrans_Click(object sender, RoutedEventArgs e)
+    {
+        TxtTransSilence.Text = TranscriptionService.DefaultSilenceCutoffMs.ToString();
+        TxtTransMax.Text = TranscriptionService.DefaultMaxChunkDurationSec.ToString();
+        TxtTransVol.Text = TranscriptionService.DefaultVolumeThreshold.ToString();
     }
 
     private void Setting_Changed(object sender, RoutedEventArgs e)
@@ -127,73 +146,42 @@ public partial class SettingsWindow : Window
 
     private void Setting_Changed(object sender, TextChangedEventArgs e) { }
 
-    private void BtnResetLayout_Click(object sender, RoutedEventArgs e)
-    {
-        ResetLayoutRequested?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void BtnApplyDecoy_Click(object sender, RoutedEventArgs e)
-    {
-        SaveSettings();
-        MessageBox.Show("Decoy Settings Applied.");
-    }
+    private void BtnResetLayout_Click(object sender, RoutedEventArgs e) => ResetLayoutRequested?.Invoke(this, EventArgs.Empty);
+    private void BtnApplyDecoy_Click(object sender, RoutedEventArgs e) { SaveSettings(); MessageBox.Show("Decoy Settings Applied."); }
+    private void BtnResetDecoy_Click(object sender, RoutedEventArgs e) { TxtDecoyTitle.Text = "Host Process"; TxtDecoyIcon.Text = ""; SaveSettings(); MessageBox.Show("Decoy Reset."); }
 
     private void BtnBrowseIcon_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new OpenFileDialog { Filter = "Icon Files|*.ico;*.png;*.jpg" };
-        if (dlg.ShowDialog() == true)
-        {
-            TxtDecoyIcon.Text = dlg.FileName;
-        }
+        if (dlg.ShowDialog() == true) TxtDecoyIcon.Text = dlg.FileName;
     }
 
-    private void BtnResetDecoy_Click(object sender, RoutedEventArgs e)
-    {
-        TxtDecoyTitle.Text = "Host Process";
-        TxtDecoyIcon.Text = "";
-        SaveSettings();
-        MessageBox.Show("Decoy Reset to Default.");
-    }
-
-    // --- HOTKEY CAPTURE ---
     private void Hotkeybox_KeyDown(object sender, KeyEventArgs e)
     {
         var textBox = sender as TextBox;
         if (textBox == null) return;
-
         e.Handled = true;
-
         var key = (e.Key == Key.System ? e.SystemKey : e.Key);
         if (key == Key.LeftShift || key == Key.RightShift || key == Key.LeftCtrl ||
-            key == Key.RightCtrl || key == Key.LeftAlt || key == Key.RightAlt || key == Key.LWin || key == Key.RWin)
-        {
-            return;
-        }
-
+            key == Key.RightCtrl || key == Key.LeftAlt || key == Key.RightAlt || key == Key.LWin || key == Key.RWin) return;
         var modifiers = Keyboard.Modifiers;
         var hotkeyStr = "";
         if (modifiers.HasFlag(ModifierKeys.Control)) hotkeyStr += "Ctrl + ";
         if (modifiers.HasFlag(ModifierKeys.Shift)) hotkeyStr += "Shift + ";
         if (modifiers.HasFlag(ModifierKeys.Alt)) hotkeyStr += "Alt + ";
         hotkeyStr += key.ToString();
-
         textBox.Text = hotkeyStr;
         SaveSettings();
     }
-
-    // --- RAG MANAGEMENT ---
 
     private async void RefreshFileList()
     {
         try
         {
             if (!File.Exists("kuroko_rag.db")) return;
-
             using var db = new VectorDbService();
             await db.InitializeAsync();
-            var sources = await db.GetSourcesAsync();
-
-            LstFiles.ItemsSource = sources;
+            LstFiles.ItemsSource = await db.GetSourcesAsync();
         }
         catch { }
     }
@@ -202,7 +190,6 @@ public partial class SettingsWindow : Window
     {
         string apiKey = TxtApiKey.Password;
         if (string.IsNullOrEmpty(apiKey)) { MessageBox.Show("Save API Key first"); return; }
-
         var dialog = new OpenFileDialog { Filter = "PDF|*.pdf" };
         if (dialog.ShowDialog() == true)
         {
@@ -211,19 +198,15 @@ public partial class SettingsWindow : Window
                 var pdfParser = new PdfParserService();
                 using var vectorDb = new VectorDbService();
                 var embeddingService = new EmbeddingService(apiKey);
-
                 await vectorDb.InitializeAsync();
                 string text = pdfParser.ExtractTextFromPdf(dialog.FileName);
                 var chunks = pdfParser.ChunkText(text);
-
                 string filename = Path.GetFileName(dialog.FileName);
-
                 foreach (var chunk in chunks)
                 {
                     var vec = await embeddingService.GenerateEmbeddingAsync(chunk);
                     if (vec.Length > 0) await vectorDb.InsertChunkAsync(chunk, vec, filename);
                 }
-
                 RefreshFileList();
                 MessageBox.Show("Uploaded.");
             }

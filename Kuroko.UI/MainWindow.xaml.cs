@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private TranscriptionService? _transcriptionService;
     private HotkeyService? _hotkeyService;
     private AiService? _aiService;
+
     private VectorDbService? _vectorDb;
     private EmbeddingService? _embeddingService;
 
@@ -46,6 +47,10 @@ public partial class MainWindow : Window
     private string _apiKey = "";
     private string _modelId = "";
     private string _systemPrompt = "";
+
+    private double _transSilenceMs = TranscriptionService.DefaultSilenceCutoffMs;
+    private double _transMaxSec = TranscriptionService.DefaultMaxChunkDurationSec;
+    private double _transVolThres = TranscriptionService.DefaultVolumeThreshold;
 
     private bool _transcriptPositioned = false;
     private bool _outputPositioned = false;
@@ -79,6 +84,12 @@ public partial class MainWindow : Window
             RegisterHotkeys();
             ApplyDeepStealth(_deepStealthEnabled);
             ApplyScreenShareProtection(_screenShareProtectionEnabled);
+
+            if (_transcriptionService != null)
+            {
+                _transcriptionService.Configure(_transSilenceMs, _transMaxSec, _transVolThres);
+            }
+
             ResetServices();
         };
 
@@ -400,6 +411,8 @@ public partial class MainWindow : Window
                 _audioService = new AudioCaptureService();
                 _transcriptionService = new TranscriptionService(_audioService);
 
+                _transcriptionService.Configure(_transSilenceMs, _transMaxSec, _transVolThres);
+
                 _transcriptionService.OnSegmentTranscribed += (s, text) =>
                 {
                     Dispatcher.Invoke(() =>
@@ -552,6 +565,10 @@ public partial class MainWindow : Window
 
                     if (k == "SYSTEM_PROMPT") _systemPrompt = v.Replace("\\n", "\n");
                     if (k == "SCREEN_SHARE_PROTECTION") bool.TryParse(v, out _screenShareProtectionEnabled);
+
+                    if (k == "TRANS_SILENCE_MS") double.TryParse(v, out _transSilenceMs);
+                    if (k == "TRANS_MAX_SEC") double.TryParse(v, out _transMaxSec);
+                    if (k == "TRANS_VOL_THRES") double.TryParse(v, out _transVolThres);
                 }
             }
         }
