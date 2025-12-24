@@ -13,6 +13,8 @@ To an interviewer viewing your screen via Zoom, Teams, or OBS, the desktop appea
 
 [![Demo Video](assets/Kuroko-poster.png)](https://youtu.be/W8_Z1CVzPLQ)
 
+*(Click the image to watch the full demo on YouTube)*
+
 ---
 
 ## 🧠 Engineering Methodology
