@@ -8,7 +8,7 @@ Kuroko is a high-performance, stealth-focused desktop assistant designed for tec
 
 ## 🎥 Demo
 
-The interface visible above is seen **only by the user**.
+> The interface visible above is seen **only by the user**.
 To an interviewer viewing your screen via Zoom, Teams, or OBS, the desktop appears completely empty.
 
 [![Demo Video](assets/Kuroko-poster.png)](https://youtu.be/W8_Z1CVzPLQ)
