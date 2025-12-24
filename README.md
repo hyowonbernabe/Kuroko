@@ -1,4 +1,4 @@
-# Kuroko (黒衣) – Stealth Interview Co-Pilot
+# Kuroko (黒子) – Stealth Interview Co-Pilot
 
 > *To exist without being seen. To help without being heard.*
 
